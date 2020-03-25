@@ -47,6 +47,11 @@ def overlay_spots(image, positions,
 
     """
     I = image.copy()
+
+    # If no positions are passed, return the same image
+    if (positions.shape[0] == 0) or (len(positions.shape) < 2):
+        return I 
+
     I_max = I.max()
     N, M = I.shape 
 
@@ -97,9 +102,9 @@ def label_binary_spots(img_bin, img_int=None):
         positions = np.asarray([ndi.center_of_mass(
             img_bin, labels=img_lab, index=index)])
     else:
-        positions = np.asarray([ndi.center_of_mass(
-            img_int, labels=img_lab, index=index)])
-    return positions 
+        positions = np.asarray(ndi.center_of_mass(
+            img_int, labels=img_lab, index=index))
+    return positions.astype('int64')
 
 
 

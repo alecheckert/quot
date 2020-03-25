@@ -8,6 +8,9 @@ import tkinter
 # Numeric
 import numpy as np 
 
+# Plotting
+import matplotlib.pyplot as plt 
+
 # Pillow-style images, expected by tkinter
 import PIL.Image, PIL.ImageTk 
 
@@ -21,39 +24,106 @@ from copy import copy
 from quot.qio import ImageFileReader 
 
 # Image filtering/BG subtraction utilities
-from quot.image_filter import ImageFilterer
+from quot.image_filter import SubregionFilterer
 
 # Detection functions
 from quot import detect 
 
+# Utilities
+from .utils import set_neg_to_zero, overlay_spots, label_binary_spots
+
 sample_file_path = '/Users/alecheckert/Imaging/tracking/200321_eikon_standardize_loc_detect/nd2_files/WellB02_Channel561_Prime95B_Seq0000.nd2'
+sample_subregion = [[200, 400], [200, 500]]
 
 class GUI(object):
-    def __init__(self, filename, gui_size=(600, 800), 
-        image_resize=0.4, **subregion_kwargs):
+    """
+
+    init
+    ----
+        filename : str, path to a TIF or ND2 file readable
+            by quot.qio.ImageFileReader
+
+        subregion : [(int, int), (int, int)], the limits
+            of a rectangular subregion in the form 
+            [(y0, y1), (x0, x1)]
+
+        method : str, the default filtering method. Can 
+            change with sliders later.
+
+        gui_height : int, the height of the GUI. This will
+            vary depending on the system. The class automatically
+            tries to resize the image to fit in this frame, but
+            this is somewhat of an art...
+
+        frame_limits : (int, int), the lower and upper
+            frames to allow in the frame slider (can 
+            be useful to look at frames closer together)
+
+    """
+    def __init__(
+        self,
+        filename,
+        subregion=None,
+        method='sub_median',
+        gui_height=500,
+        frame_limits=None,
+    ):
         self.filename = filename
-        self.gui_size = gui_size 
-        self.image_resize = image_resize
-        self.subregion_kwargs = subregion_kwargs
+        self.gui_height = gui_height
+        self.method = method 
 
         # Image file reader
         self.reader = ImageFileReader(self.filename)
         self.n_frames, self.N, self.M = self.reader.get_shape()
 
-        # Set the positions of each of the images (somewhat
-        # of an art)
-        y = 350
-        x = self.N / self.M
+        # If no subregion is passed, default to the full frame
+        if subregion is None:
+            self.subregion = [[0, self.N], [0, self.M]]
+        else:
+            self.subregion = subregion 
+
+        # If no frame limits are passed, default to the 
+        # first and last frame
+        if frame_limits is None:
+            self.frame_limits = (0, self.n_frames)
+        else:
+            self.frame_limits = frame_limits
+
+        # Set the positions and sizes of each of the images
+
+        # Height and width of an individual image in pixels
+        IH = self.subregion[0][1] - self.subregion[0][0]
+        IW = self.subregion[1][1] - self.subregion[1][0]
+
+        # Subregion aspect ratio
+        AR = IH / IW 
+
+        # Set GUI width
+        self.gui_width = int(self.gui_height / AR)+1
+        self.gui_size = (self.gui_height, self.gui_width)
+
+        # y: the dividing line between the two columns of images
+        y = self.gui_width // 2
+        x = self.gui_height // 2
+
+        # The positions of each image in the frame (frame_0)
         self.image_pos = [
-            [0, 0], [0, int(y*x)], [y, 0], [y, int(x*y)]
+            [0, 0], [0, x], [y, 0], [y, x]
         ]
 
-        # Image filtering kwargs; default to None
-        self.filter_kwargs = {'method': None}
+        # The image resizing factor, chosen so that the images
+        # fill the frame
+        self.image_resize = (0.5 * self.gui_height / IH)
+
+        # Image filtering kwargs; default to none
+        self.filter_kwargs = {}
 
         # Image filterer
-        self.filterer = ImageFilterer(self.reader, 
-            **self.filter_kwargs)
+        self.filterer = SubregionFilterer(self.reader, 
+            self.subregion, self.method)
+
+        # Crosshair length, for overlaying detections
+        self.crosshair_len = 4
 
 
         ## TKINTER INTERFACE COMPARTMENTALIZATION
@@ -85,7 +155,7 @@ class GUI(object):
         # The type of filtering approach, which responds 
         # to menu self.M0
         self.filter_type = tkinter.StringVar(self.root)
-        self.filter_type.set('sub_gauss_filt_avg')
+        self.filter_type.set(self.method)
         self.filter_type.trace('w', self._change_filter_type_callback)
 
         # The type of detection approach, which responds
@@ -94,13 +164,19 @@ class GUI(object):
         self.detect_type.set('simple_gauss')
         self.detect_type.trace('w', self._change_detect_type_callback)
 
+        # The block size, the temporal size of the block
+        # used for image filtering
+        self.block_size_var = tkinter.IntVar(self.root)
+        self.block_size_var.set(60)
+        self.block_size_var.trace('w', self._change_block_size_callback)
+
         # Default detection function and corresponding kwargs
         self.detect_f = DETECT_METHODS[self.detect_type.get()]
         self.detect_kwargs = DETECT_KWARGS_DEFAULT[self.detect_type.get()]
 
         # The current frame index, which responds to 
         # slider self.s00
-        self.frame_idx = 0
+        self.frame_idx = self.frame_limits[0]
 
         # The current image vmax, which responds to 
         # slider self.s10
@@ -146,6 +222,23 @@ class GUI(object):
         self.M1 = tkinter.OptionMenu(self.frame_1, self.detect_type,
             *detect_choices)
         self.M1.grid(row=0, column=1, pady=5, padx=5)
+
+        # Menu that chooses the block size, informing 
+        # self.block_size_var
+        block_size_choices = [5, 10, 20, 40, 60, 100, 200, 300]
+        m2_label = tkinter.Label(self.frame_1, text='Filter block size')
+        m2_label.grid(row=0, column=2, sticky=tkinter.W, pady=5, padx=5)
+        self.M2 = tkinter.OptionMenu(self.frame_1, self.block_size_var,
+            *block_size_choices)
+        self.M2.grid(row=1, column=2, pady=5, padx=5)
+
+        # Button to show detections, if desired
+        self.B0 = tkinter.Button(self.frame_1, text='Overlay detections',
+            command=self._overlay_detections_callback)
+        self.B0.grid(row=2, column=2, pady=5, padx=5)
+
+        # The current state of this button
+        self.B0_state = False 
 
 
         ## SLIDER LABELS, which change in response to 
@@ -249,14 +342,14 @@ class GUI(object):
             'padx': 5}
 
         # slider S00, which informs self.frame_idx
-        self.S00 = tkinter.Scale(self.frame_1, from_=0, 
-            to=self.n_frames, command=self._set_frame_idx,
+        self.S00 = tkinter.Scale(self.frame_1, from_=self.frame_limits[0], 
+            to=self.frame_limits[1], command=self._set_frame_idx,
             **slider_kwargs)
         self.S00.grid(row=2, column=0, **s_grid_kwargs)
         self.S00.set(0)
 
         # slider S10, which informs self.vmax
-        self.S10 = tkinter.Scale(self.frame_1, from_=0.0,
+        self.S10 = tkinter.Scale(self.frame_1, from_=10.0,
             to=255.0, command=self._set_vmax,
             **slider_kwargs)
         self.S10.grid(row=4, column=0, **s_grid_kwargs)
@@ -270,6 +363,8 @@ class GUI(object):
         self.S20.grid(row=6, column=0, **s_grid_kwargs)
         if len(FILTER_KWARG_MAP[v]) > 0:
             self.S20.set(FILTER_KWARGS_DEFAULT[v][FILTER_KWARG_MAP[v][0]])
+        else:
+            self.S20.set(1.0)
 
         # slider S30, which informs self.k1. Responds to 
         # changes in the filter type
@@ -278,6 +373,8 @@ class GUI(object):
         self.S30.grid(row=8, column=0, **s_grid_kwargs)
         if len(FILTER_KWARG_MAP[v]) > 1:
             self.S30.set(FILTER_KWARGS_DEFAULT[v][FILTER_KWARG_MAP[v][1]])
+        else:
+            self.S30.set(1.0)
 
         # slider S01, which informs self.k2. Responds to 
         # changes in the detect type
@@ -287,6 +384,8 @@ class GUI(object):
         self.S01.grid(row=2, column=1, **s_grid_kwargs)
         if len(DETECT_KWARG_MAP[v]) > 0:
             self.S01.set(DETECT_KWARGS_DEFAULT[v][DETECT_KWARG_MAP[v][0]])
+        else:
+            self.S01.set(1.0)
 
         # slider S11, which informs self.k3. Responds to 
         # changes in the detect type
@@ -295,6 +394,8 @@ class GUI(object):
         self.S11.grid(row=4, column=1, **s_grid_kwargs)
         if len(DETECT_KWARG_MAP[v]) > 1:
             self.S11.set(DETECT_KWARGS_DEFAULT[v][DETECT_KWARG_MAP[v][1]])
+        else:
+            self.S11.set(1.0)
 
         # slider S21, which informs self.k4. Responds to 
         # changes in the detect type
@@ -303,6 +404,8 @@ class GUI(object):
         self.S21.grid(row=6, column=1, **s_grid_kwargs)
         if len(DETECT_KWARG_MAP[v]) > 2:
             self.S21.set(DETECT_KWARGS_DEFAULT[v][DETECT_KWARG_MAP[v][2]])
+        else:
+            self.S21.set(1.0)
 
         # slider S31, which informs self.k5. Responds to 
         # changes in the detect type
@@ -311,6 +414,8 @@ class GUI(object):
         self.S31.grid(row=8, column=1, **s_grid_kwargs)
         if len(DETECT_KWARG_MAP[v]) > 3:
             self.S31.set(DETECT_KWARGS_DEFAULT[v][DETECT_KWARG_MAP[v][3]])
+        else:
+            self.S31.set(1.0)
 
 
         ## GRID INITIALIZATION
@@ -324,7 +429,11 @@ class GUI(object):
         self._update_detect_sliders()
 
         # Regenerate the primary photo
-        self.img_00 = self.reader.get_frame(self.frame_idx)
+        self.img_00 = self.reader.frame_subregion(
+            self.frame_idx,
+            y0=self.subregion[0][0], y1=self.subregion[0][1],
+            x0=self.subregion[1][0], x1=self.subregion[1][1]
+        ).astype('float64')
         self._filter()
         self._detect()
         self._regenerate_photos()
@@ -339,6 +448,14 @@ class GUI(object):
     def _change_detect_type_callback(self, *args):
         self._update_detect_sliders()
 
+    def _change_block_size_callback(self, *args):
+        self._change_block_size()
+
+    def _overlay_detections_callback(self, *args):
+        self.B0_state = not self.B0_state 
+        self._regenerate_primary_photo()
+        self._regenerate_photos()
+
     def _update_filter_sliders(self):
         """
         Use the current value of self.filter_type to 
@@ -350,8 +467,7 @@ class GUI(object):
 
         # Set up the image filterer for this method
         self.filter_kwargs = FILTER_KWARGS_DEFAULT[v]
-        self.filterer = ImageFilterer(self.reader,
-            **self.filter_kwargs)
+        self.filterer._change_filter_method(v, **self.filter_kwargs)
 
         # Set the slider names
         try:
@@ -372,11 +488,13 @@ class GUI(object):
                 to=FILTER_SLIDER_LIMITS[v][0][1],
                 resolution=FILTER_SLIDER_RESOLUTIONS[v][0]
             )
+            self.S20.set(FILTER_KWARGS_DEFAULT[v][FILTER_KWARG_MAP[v][0]])
             self.S30.configure(
                 from_=FILTER_SLIDER_LIMITS[v][1][0],
                 to=FILTER_SLIDER_LIMITS[v][1][1],
                 resolution=FILTER_SLIDER_RESOLUTIONS[v][1]
             )
+            self.S30.set(FILTER_KWARGS_DEFAULT[v][FILTER_KWARG_MAP[v][1]])
         except IndexError:
             pass 
 
@@ -413,25 +531,47 @@ class GUI(object):
                 to=DETECT_SLIDER_LIMITS[v][0][1],
                 resolution=DETECT_SLIDER_RESOLUTIONS[v][0]
             )
+            self.S01.set(DETECT_KWARGS_DEFAULT[v][DETECT_KWARG_MAP[v][0]])
             self.S11.configure(
                 from_=DETECT_SLIDER_LIMITS[v][1][0],
                 to=DETECT_SLIDER_LIMITS[v][1][1],
                 resolution=DETECT_SLIDER_RESOLUTIONS[v][1]
             )
+            self.S11.set(DETECT_KWARGS_DEFAULT[v][DETECT_KWARG_MAP[v][1]])
             self.S21.configure(
                 from_=DETECT_SLIDER_LIMITS[v][2][0],
                 to=DETECT_SLIDER_LIMITS[v][2][1],
                 resolution=DETECT_SLIDER_RESOLUTIONS[v][2]
             )
+            self.S21.set(DETECT_KWARGS_DEFAULT[v][DETECT_KWARG_MAP[v][2]])
             self.S31.configure(
                 from_=DETECT_SLIDER_LIMITS[v][3][0],
                 to=DETECT_SLIDER_LIMITS[v][3][1],
                 resolution=DETECT_SLIDER_RESOLUTIONS[v][3]
             )
+            self.S31.set(DETECT_KWARGS_DEFAULT[v][DETECT_KWARG_MAP[v][3]])
         except IndexError:
             pass
 
         # Run detection and update the canvas 
+        self._detect()
+        self._regenerate_photos()
+
+    def _change_block_size(self):
+        """
+        Update the filterer's block size argument
+        in response to change in self.block_size_var,
+        set by the option menu self.M2.
+
+        """
+        # Get the current value of the block size 
+        block_size = int(self.block_size_var.get())
+
+        # Set the block size of the underlying filterer
+        self.filterer._set_block_size(block_size)
+
+        # Update the frame
+        self._filter()
         self._detect()
         self._regenerate_photos()
 
@@ -441,7 +581,10 @@ class GUI(object):
         to the current filtering settings.
 
         """
-        self.img_01 = self.filterer.filter_frame(self.frame_idx)
+        self.img_01 = self.filterer.filter_frame(
+            self.frame_idx,
+            **self.filter_kwargs,
+        )
 
     def _detect(self):
         """
@@ -462,7 +605,11 @@ class GUI(object):
 
     def _set_frame_idx(self, frame_idx):
         self.frame_idx = int(frame_idx)
-        self.img_00 = self.reader.get_frame(self.frame_idx).astype('float64')
+        self.img_00 = self.reader.frame_subregion(
+            self.frame_idx, 
+            y0=self.subregion[0][0], y1=self.subregion[0][1],
+            x0=self.subregion[1][0], x1=self.subregion[1][1]
+        ).astype('float64')
         self._filter()
         self._detect()
         self._regenerate_photos()
@@ -477,7 +624,6 @@ class GUI(object):
         v = self.filter_type.get()
         if len(FILTER_KWARG_MAP[v]) > 0:
             self.filter_kwargs[FILTER_KWARG_MAP[v][0]] = self.k0 
-        self.filterer = ImageFilterer(self.reader, **self.filter_kwargs)
         self._filter()
         self._detect()
         self._regenerate_photos()
@@ -487,7 +633,6 @@ class GUI(object):
         v = self.filter_type.get()
         if len(FILTER_KWARG_MAP[v]) > 1:
             self.filter_kwargs[FILTER_KWARG_MAP[v][1]] = self.k1 
-        self.filterer = ImageFilterer(self.reader, **self.filter_kwargs)
         self._filter()
         self._detect()
         self._regenerate_photos()
@@ -530,13 +675,31 @@ class GUI(object):
         self.img_00, in the upper left.
 
         """
-        self.photo_00 = get_photo(self.img_00, vmax=255.0,
-            resize=self.image_resize)
-        self.canvas.create_image(
-            self.image_pos[0][0],
-            self.image_pos[0][1],
-            image=self.photo_00,
-            anchor=tkinter.NW)
+        if not self.B0_state:
+            self.photo_00 = get_photo(self.img_00, vmax=255.0,
+                resize=self.image_resize)
+            self.canvas.create_image(
+                self.image_pos[0][0],
+                self.image_pos[0][1],
+                image=self.photo_00,
+                anchor=tkinter.NW)
+        else:
+            positions = label_binary_spots(self.img_11,
+                img_int=self.img_01)
+            self.photo_00 = get_photo(
+                overlay_spots(
+                    self.img_00,
+                    positions,
+                    crosshair_len=self.crosshair_len,
+                ),
+                vmax=255.0,
+                resize=self.image_resize
+            )
+            self.canvas.create_image(
+                self.image_pos[0][0],
+                self.image_pos[0][1],
+                image=self.photo_00,
+                anchor=tkinter.NW)
 
     def _regenerate_photos(self):
         """
@@ -544,22 +707,72 @@ class GUI(object):
         the current value of self.vmax.
 
         """
-        self.photo_01 = get_photo(self.img_01, vmax=self.vmax,
-            resize=self.image_resize)
-        self.photo_10 = get_photo(self.img_10, vmax=self.vmax,
-            resize=self.image_resize)
+        if not self.B0_state:
+            self.photo_01 = get_photo(self.img_01, vmax=self.vmax,
+                resize=self.image_resize)
+            self.photo_10 = get_photo(self.img_10, vmax=self.vmax,
+                resize=self.image_resize)
+            self.canvas.create_image(
+                self.image_pos[1][0], 
+                self.image_pos[1][1],
+                image=self.photo_01,
+                anchor=tkinter.NW)
+            self.canvas.create_image(
+                self.image_pos[2][0],
+                self.image_pos[2][1],
+                image=self.photo_10,
+                anchor=tkinter.NW)
+        else:
+            positions = label_binary_spots(
+                self.img_11,
+                img_int=self.img_01,
+            )
+            self.photo_00 = get_photo(
+                overlay_spots(
+                    self.img_00,
+                    positions,
+                    crosshair_len=self.crosshair_len,
+                ),
+                vmax=255.0,
+                resize=self.image_resize,
+            )
+            self.photo_01 = get_photo(
+                overlay_spots(
+                    self.img_01,
+                    positions,
+                    crosshair_len=self.crosshair_len,
+                ),
+                vmax=self.vmax,
+                resize=self.image_resize
+            )
+            self.photo_10 = get_photo(
+                overlay_spots(
+                    self.img_10,
+                    positions,
+                    crosshair_len=self.crosshair_len,
+                ),
+                vmax=self.vmax,
+                resize=self.image_resize
+            )
+            self.canvas.create_image(
+                self.image_pos[0][0],
+                self.image_pos[0][1],
+                image=self.photo_00,
+                anchor=tkinter.NW)
+            self.canvas.create_image(
+                self.image_pos[1][0], 
+                self.image_pos[1][1],
+                image=self.photo_01,
+                anchor=tkinter.NW)
+            self.canvas.create_image(
+                self.image_pos[2][0],
+                self.image_pos[2][1],
+                image=self.photo_10,
+                anchor=tkinter.NW)
+
+        # Don't ever overlay spots on the binary image 
         self.photo_11 = get_photo(self.img_11, vmax=self.vmax,
             resize=self.image_resize)
-        self.canvas.create_image(
-            self.image_pos[1][0], 
-            self.image_pos[1][1],
-            image=self.photo_01,
-            anchor=tkinter.NW)
-        self.canvas.create_image(
-            self.image_pos[2][0],
-            self.image_pos[2][1],
-            image=self.photo_10,
-            anchor=tkinter.NW)
         self.canvas.create_image(
             self.image_pos[3][0],
             self.image_pos[3][1],
@@ -605,7 +818,7 @@ def img_to_rgb(img, expand=1, vmax=255.0, vmin=0.0):
     else:
         return img_rgb 
 
-def get_photo(img, expand=1, vmax=255.0, resize=0.4):
+def get_photo(img, expand=1, vmax=255.0, resize=1.0):
     if resize is None:
         return PIL.ImageTk.PhotoImage(
             image=PIL.Image.fromarray(
@@ -620,6 +833,39 @@ def get_photo(img, expand=1, vmax=255.0, resize=0.4):
             ).resize((shape*resize).astype('uint16')[::-1]),
         ) 
 
+def find_and_overlay_spots(img, img_bin, crosshair_len=4):
+    """
+    Find contiguous binary spots in a binary image
+    and overlay them on a different image. Returns
+    a copy of the image.
+
+    args
+    ----
+        img : 2D ndarray, the image on which to overlay
+            locs
+        img_bin : 2D ndarray, binary image in which to 
+            look for spots
+        crosshair_len : int, crosshair length
+
+    returns
+    -------
+        2D ndarray, copy of *img* with overlaid spots
+
+    """
+    # If there are too many spots, give up - this
+    # happens sometimes when the threshold is all wrong
+    img_size = np.asarray(img_bin.shape).prod()
+    if img_bin.sum() > img_size * 0.2:
+        return img 
+
+    # Otherwise overlay the spots
+    positions = label_binary_spots(img_bin,
+        img_int=img)
+    result = overlay_spots(img, positions, 
+        crosshair_len=crosshair_len)
+    return result 
+
+
 def set_neg_to_zero(ndarray):
     ndarray[ndarray < 0.0] = 0
     return ndarray 
@@ -628,42 +874,48 @@ def set_neg_to_zero(ndarray):
 # Default parameter sets when changing to a different
 # filtering method
 FILTER_KWARGS_DEFAULT = {
-    'sub_moving_min' : {
-        'method': 'sub_moving_min',
-        'block_size': 200,
-        'min_window': 10,
-        'scale': 1.0
-    },
-    'sub_gauss_filt_avg': {
-        'method': 'sub_gauss_filt_avg',
-        'block_size': 200,
-        'k': 2.0,
-        'scale': 1.0
-    },
-    'None': {},
+    'unfiltered': {},
+    'sub_median': {'scale': 1.0},
+    'sub_min': {'scale': 1.0},
+    'sub_mean': {'scale': 1.0},
+    'sub_gauss_filt_median': {'k': 2.0, 'scale': 1.0},
+    'sub_gauss_filt_min': {'k': 2.0, 'scale': 1.0},
+    'sub_gauss_filt_mean': {'k': 2.0, 'scale': 1.0},
 }
 
 # The mapping of filtering keyword arguments to 
 # sliders S20 and S30
 FILTER_KWARG_MAP = {
-    'sub_moving_min': ['min_window', 'scale'],
-    'sub_gauss_filt_avg': ['k', 'scale'],
-    'None': [],
+    'unfiltered': [],
+    'sub_median': ['scale'],
+    'sub_min': ['scale'],
+    'sub_mean': ['scale'],
+    'sub_gauss_filt_median': ['k', 'scale'],
+    'sub_gauss_filt_min': ['k', 'scale'],
+    'sub_gauss_filt_mean': ['k', 'scale'],
 }
 
 # Step size of the filtering sliders S20 and S30 
 FILTER_SLIDER_RESOLUTIONS = {
-    'sub_moving_min': [1, 0.1],
-    'sub_gauss_filt_avg': [0.1, 0.1],
-    'None': [],
+    'unfiltered': [],
+    'sub_median': [0.01],
+    'sub_min': [0.01],
+    'sub_mean': [0.01],
+    'sub_gauss_filt_median': [0.1, 0.01],
+    'sub_gauss_filt_min': [0.1, 0.01],
+    'sub_gauss_filt_mean': [0.1, 0.01],
 }
 
 # Lower and upper limits for the filtering sliders
 # S20 and S30 
 FILTER_SLIDER_LIMITS = {
-    'sub_moving_min': [[0, 40], [0.0, 3.0]],
-    'sub_gauss_filt_avg': [[0.0, 20.0], [0.0, 3.0]],
-    'None': [[]],
+    'unfiltered': [[]],
+    'sub_median': [[0.5, 1.5]],
+    'sub_min': [[0.5, 1.5]],
+    'sub_mean': [[0.5, 1.5]],
+    'sub_gauss_filt_median': [[0.0, 10.0], [0.5, 1.5]],
+    'sub_gauss_filt_min': [[0.0, 10.0], [0.5, 1.5]],
+    'sub_gauss_filt_mean': [[0.0, 10.0], [0.5, 1.5]],
 }
 
 # The detection functions, keyed by option in 
@@ -713,7 +965,3 @@ DETECT_SLIDER_LIMITS = {
     'DoU': [[1, 11], [1, 21], [0.0, 40.0]],
     'simple_gauss': [[0.0, 5.0], [0.0, 40.0]]
 }
-
-if __name__ == '__main__':
-    x = GUI(sample_file_path)
-

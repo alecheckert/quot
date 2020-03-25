@@ -15,107 +15,96 @@ import os
 # Custom utilities
 from quot.utils import set_neg_to_zero 
 
-class ImageFilterer(object):
+class SubregionFilterer(object):
     """
-    A filterer for a raw image filestream. 
+    A filterer for an image subregion, designed
+    to be used with gui.GUI.
+
+    Most of the filtering techniques operate on a
+    `block` of several subsequent frames. 
+
+    Unlike the ImageFilterer class, the SubregionFilterer
+    class holds the entire raw `block` in memory.
+    It will only perform filtering on frames as necessary,
+    when the user passes changes in the filtering method.
 
     init
     ----
         ImageFileReader : quot.qio.ImageFileReader
-            object, the filestream reader
 
-        method : str, key to one of the methods in
-            FILTER_METHODS
+        subregion : [(int, int), (int, int)], subregion
+            limits in format [(y0, y1), (x0, x1)]
 
-        block_size : int, the temporal size of the 
-            image block to use for filtering
+        method : str, method to use for filtering
 
-        **method_kwargs : to the method
+        block_size : int, the temporal size of blocks
+            to use for filtering
 
+        **method_kwargs : to the filtering method
 
     """
-    def __init__(self, ImageFileReader, method=None, 
-        block_size=10, start_iter=0, stop_iter=None,
-        **method_kwargs):
+    def __init__(self, ImageFileReader, subregion,
+        method=None, block_size=100, **filter_kwargs):
         self.ImageFileReader = ImageFileReader 
+        self.subregion = subregion
         self.method = method 
-        self.block_size = block_size 
-        self.method_kwargs = method_kwargs
+        self.block_size = block_size
+        self.filter_kwargs = filter_kwargs
 
-        # If the user passes a str for ImageFileReader,
-        # see if we can interpret it as a file path and
-        # read with qio.ImageFileReader
-        if isinstance(ImageFileReader, str) and \
-            os.path.isfile(ImageFileReader):
-            self.ImageFileReader = io.ImageFileReader(
-                self.ImageFileReader)
+        # Determine whether the subregion limits are
+        # valid for this reader
+        assert self._subregion_valid(self.subregion)
 
         # If no method passed, default to raw movie
-        if (self.method is None) or (self.method=='None'):
-            self.method_f = lambda x: x
+        if (self.method is None) or (self.method == 'None'):
+            self.method = 'unfiltered'
 
-        # Otherwise, find desired filtering method
-        else:
-            try:
-                self.method_f = FILTER_METHODS[self.method]
-            except KeyError:
-                raise RuntimeError("ImageFilterer.__init__: " \
-                    "method %s not found; available methods " \
-                    "are %s" % (method, ", ".join(FILTER_METHODS.keys())))
+        # Find desired filtering method
+        try:
+            self.method_f = FILTER_METHODS[self.method]
+        except KeyError:
+            raise RuntimeError("SubregionFilterer.__init__: " \
+                "method %s not found; available methods " \
+                "are %s" % (method, ", ".join(FILTER_METHODS.keys())))
 
-        # Get the movie length and shape
-        self.n_frames, self.height, self.width = \
-            self.ImageFileReader.get_shape()
+        # Get the movie length and shape 
+        self.n_frames = self.ImageFileReader.n_frames 
+        self.height = subregion[0][1] - subregion[0][0]
+        self.width = subregion[1][1] - subregion[1][0]
 
-        # Set the defaults for iteration
-        self.start_iter = start_iter
-        self.stop_iter = stop_iter 
-        if self.start_iter is None:
-            self.start_iter = 0
-        if self.stop_iter is None:
-            self.stop_iter = self.n_frames
-
-    def __iter__(self):
-        # Global frame index
-        self.frame_idx = self.start_iter
-
-        # Load the first block
+        # Set the initial frame to zero
+        self.frame_idx = 0
         self._update_block(self.frame_idx)
 
-        return self 
+    def _set_block_size(self, block_size):
+        """
+        Change the block size for this filtering
+        method.
 
-    def __next__(self):
-        if self.frame_idx < self.stop_iter:
+        """
+        self.block_size = block_size 
+        block_start = self._get_block_start(self.frame_idx)
+        self._update_block(block_start)
 
-            # Load and filter a new block, if necessary
-            if self.frame_idx_in_block == self.block_size:
-                self._update_block(self.frame_idx)
+    def _set_filter_kwargs(self, **kwargs):
+        """
+        Make modifications to the current 
+        set of filter keyword arguments.
 
-            # Get next frame from this block
-            result = self.block[self.frame_idx_in_block]
-
-            # Update global and block frame indices
-            self.frame_idx += 1
-            self.frame_idx_in_block += 1
-
-            return result 
-
-        else:
-            raise StopIteration
+        """
+        for k in kwargs.keys():
+            self.filter_kwargs[k] = kwargs[k]
 
     def _update_block(self, start_frame):
         """
-        Load and filter a new image block, holding it
-        at self.block.
+        Load a new image block into memory, 
+        filtering it as necessary.
 
-        If the start_frame is within one block width
-        of the end of the movie, adjust the block limits
-        so that we filter over a block of the full width.
-        This involves some redundant filtering.
-
-        Parameters
-        ----------
-            start_frame, stop_frame :  int, frame indices
+        args
+        ----
+            start_frame : int, the frame that
+                starts the block. If *None*,
+                defaults to the current frame.
 
         """
         # If we're too close to the end, adjust 
@@ -128,292 +117,263 @@ class ImageFilterer(object):
             self.frame_idx_in_block = 0
 
         # Load the raw images 
-        imgs = self.ImageFileReader.get_frame_range(
-            start_frame, start_frame+self.block_size)
+        self.block = self.ImageFileReader.subregion(
+            start_frame=start_frame,
+            stop_frame=start_frame+self.block_size,
+            y0=self.subregion[0][0],
+            y1=self.subregion[0][1],
+            x0=self.subregion[1][0],
+            x1=self.subregion[1][1]
+        )
 
-        # Perform the filtering routine
-        self.block = self.method_f(
-            imgs, **self.method_kwargs)
+        # Perform the preprocessing routine, calculating
+        # the filtered versions of the block
+        self._filter_block()
 
         # Record the current block start
         self.block_start = start_frame 
 
-    def filter_all(self):
+    def _get_block_start(self, frame_idx):
         """
-        Read the full filtered movie into an 
-        ndarray.
-
-        Returns
-        -------
-            3D ndarray (TYX), the filtered movie
+        Given the current value of self.block_size, 
+        return the starting frame for the block
+        corresponding to *frame_idx*.
 
         """
-        result = np.empty(self.ImageFileReader.get_shape(),
-            dtype='float64')
-        for frame_idx, frame in enumerate(self):
-            result[frame_idx,:,:] = frame 
-        return result 
+        return min([
+            self.n_frames - self.block_size,
+            self.block_size * (frame_idx // self.block_size)
+        ])
 
-    def filter_frame(self, frame_idx):
+    def _filter_block(self):
         """
-        Return a single filtered frame from a movie.
+        Preprocess the current block for filter 
+        functions.
 
-        Parameters
-        ----------
-            frame_idx : int
+        This means calculating a set of standard 
+        functions on the block, including mean,
+        median, and min images.
 
-        Returns
-        -------
-            2D ndarray (YX)
-
-        """
-        assert self.ImageFileReader._frame_valid(frame_idx)
-
-        # Check to see if we already have the 
-        # filtered block in memory
-        if not self._in_current_block(frame_idx):
-
-            # Load the appropriate block 
-            block_start = self.block_size * (
-                frame_idx // self.block_size)
-            self._update_block(block_start)
-
-        # Return the desired frame
-        return self.block[frame_idx-self.block_start]
-
-    def filter_range(self, start_frame, stop_frame):
-        """
-        Return a set of filtered frames. Does not
-        include *stop_frame*.
-
-        Parameters
-        ----------
-            start_frame, stop_frame : int
-
-        Returns
-        -------
-            3D ndarray (TYX)
+        Calculating these in advance speeds up
+        the filtering of individual frames when
+        applying changes in the filtering routine.
 
         """
-        assert self.ImageFileReader._frame_range_valid(
-            start_frame, stop_frame)
-        result = np.empty((stop_frame-start_frame, self.height,
-            self.width), dtype='float64')
-        for j, frame_idx in enumerate(range(start_frame, stop_frame)):
-            result[j,:,:] = self.filter_frame(frame_idx)
-        return result
+        self.filt_imgs = {
+            'mean': self.block.mean(axis=0).astype('float64'),
+            'min': self.block.min(axis=0).astype('float64'),
+            'median': np.median(self.block, axis=0).astype('float64'),
+        }
 
     def _in_current_block(self, frame_idx):
         """
-        Return True if the desired frame corresponds
-        to a frame currently at self.block.
-
-        Parameters
-        ----------
-            frame_idx : int
-
-        Returns
-        ------- 
-            bool
+        Return True if the frame is in the 
+        current block.
 
         """
         return hasattr(self, 'block_start') and \
             (frame_idx >= self.block_start) and \
             (frame_idx < self.block_start+self.block_size)
 
-## 
-## FILTERING METHODS
-## 
-def sub_median(imgs, scale=1.0):
+    def _subregion_valid(self, subregion):
+        """
+        Return True if the subregion is within the
+        size limits of frame size.
+
+        """
+        H = self.ImageFileReader.height
+        W = self.ImageFileReader.width 
+        return all([
+            subregion[0][0] <= H,
+            subregion[0][1] <= H,
+            subregion[1][0] <= W,
+            subregion[1][1] <= W, 
+            subregion[0][0] <= subregion[0][1],
+            subregion[1][0] <= subregion[1][1]
+        ])
+
+    def _change_filter_method(self, method, **filter_kwargs):
+
+        # If None, default to no filtering
+        if (method is None) or (method == 'None'):
+            method = 'unfiltered'
+        self.method = method
+
+        # Find the desired filter method
+        try:
+            self.method_f = FILTER_METHODS[self.method]
+        except KeyError:
+            raise RuntimeError("SubregionFilterer.__init__: " \
+                "method %s not found; available methods " \
+                "are %s" % (method, ", ".join(FILTER_METHODS.keys())))
+
+        # Reset the filtering keyword arguments to their
+        # defaults
+        self.filter_kwargs = {}
+
+        # Set newly passed filtering keyword arguments
+        if len(filter_kwargs) > 0:
+            self._set_filter_kwargs(**filter_kwargs)
+
+    def filter_frame_and_change_block_size(self, frame_idx,
+        block_size, **filter_kwargs):
+        """
+        First change the block size of the filterer, 
+        then return a specific frame. 
+
+        args
+        ----
+            frame_idx : int
+            block_size : int
+            **filter_kwargs : to the filtering method
+
+        returns
+        -------
+            2D ndarray, filtered frame
+
+        """
+        self.frame_idx = frame_idx 
+        self._set_block_size(block_size)
+        return self.filter_frame(frame_idx, **filter_kwargs)
+
+    def filter_frame(self, frame_idx, **filter_kwargs):
+        """
+        Return a single filtered frame from a 
+        movie.
+
+        args
+        ----
+            frame_idx : int
+            **filter_kwargs : any CHANGES to the kwargs
+                to the current filtering function. These
+                are recorded and used for subsequent
+                filtering.
+
+        returns
+        -------
+            2D ndarray, the filtered frame
+
+        """
+        assert self.ImageFileReader._frame_valid(frame_idx)
+
+        # Check to see if we already have the
+        # filtered block in memory
+        if not self._in_current_block(frame_idx):
+
+            # Load the appropriate block
+            block_start = self.block_size * (
+                frame_idx // self.block_size)
+            self._update_block(block_start)
+
+        # Record the current frame index in the context
+        # of this block
+        self.frame_idx = frame_idx 
+        self.frame_idx_in_block = self.frame_idx - self.block_start
+
+        # Save the filtering keyword arguments
+        if len(filter_kwargs) > 0:
+            self._set_filter_kwargs(**filter_kwargs)
+
+        # Get the subtraction image according to the
+        # present method
+        sub_img = self.filt_imgs[FILTER_METHOD_INPUTS[self.method]]
+
+        # Apply the filtering routine
+        return self.method_f(
+            self.block[self.frame_idx_in_block],
+            sub_img, 
+            **self.filter_kwargs
+        )
+
+
+#
+# FILTERING METHODS
+#
+def unfiltered(img, no_img):
     """
-    Subtract the movie's median w.r.t time 
-    from each frame.
-
-    Parameters
-    ----------
-        imgs : 3D ndarray (TYX)
-        scale : float, scale the avg image by 
-            this amount before subtraction
-
-    Returns
-    -------
-        3D ndarray (TYX), filtered movie
+    Do not perform filtering.
 
     """
-    return set_neg_to_zero(imgs - \
-        scale * np.median(imgs, axis=0))
+    return img 
 
-def sub_scaled_median(imgs, scale=1.0):
+def sub_median(img, median_img, scale=1.0):
     """
-    Subtract the movie's median w.r.t time
-    from each frame, scaled by that frame's
-    median.
-
-    Parameters
-    ----------
-        imgs : 3D ndarray (TYX)
-        scale : float, scale the avg image by 
-            this amount before subtraction
-
-    Returns
-    -------
-        3D ndarray (TYX), filtered movie
+    Subtract the movie's median with respect to 
+    time from the frame.
 
     """
-    # Get the average frame
-    img_med = np.median(imgs, axis=0)
+    return set_neg_to_zero(img-scale*median_img)
 
-    # Get each frame's median
-    meds = np.median(imgs, axis=(1,2))
-
-    # Scale the medians
-    _max, _min = meds.max(), meds.min()
-    if _max == _min:
-        meds = scale * np.ones(meds.shape[0])
-    else:
-        meds = scale * (meds-_min)/(_max-_min)
-
-    # Subtract from each frame
-    return set_neg_to_zero(np.asarray([
-        imgs[i,:,:]-img_med for \
-            i, m in enumerate(meds)
-    ]))
-
-def sub_moving_min(imgs, min_window=10, scale=1.0):
+def sub_min(img, min_img, scale=1.0):
     """
-    Subtract a minimum projection of the stack
-    from each frame.
-
-    Parameters
-    ----------
-        imgs : 3D ndarray (TYX)
-        min_window : int, number of frames to
-            take the minimum projection over
-        scale : float, intensity modifier
-
-    Returns
-    -------
-        3D ndarray (TYX), filtered movie
+    Subtract a pixelwise minimum from each 
+    frame.
 
     """
-    T, N, M = imgs.shape 
-    min_window = int(min([min_window, T]))
+    return set_neg_to_zero(img-scale*min_img)
 
-    # Assign each frame to a min block
-    nu = T // min_window 
-
-    # Perform the subtraction
-    result = np.empty((T, N, M), dtype='float64')
-    for i in range(nu-1):
-        f0 = i*min_window
-        f1 = (i+1)*min_window
-        result[f0:f1] = imgs[f0:f1] - \
-            scale*imgs[f0:f1].min(axis=0)
-
-    # For the last block, make sure that we're 
-    # taking a full window for the min calculation
-    f0 = T-min_window
-    f1 = T 
-    result[f0:f1] = imgs[f0:f1] - \
-        scale*imgs[f0:f1].min(axis=0)
-
-    return result 
-
-def sub_gauss_filt_avg(imgs, k=2.0, scale=1.0):
+def sub_mean(img, mean_img, scale=1.0):
     """
-    Subtract a Gaussian-filtered mean image
-    from each frame.
-
-    Parameters
-    ----------
-        imgs : 3D ndarray (TYX)
-        k : float, width of Gaussian kernel
-        scale : float, intensity modifier 
-
-    Returns
-    -------
-        3D ndarray (TYX), filtered movie
+    Subtract the pixelwise mean from each
+    frame.
 
     """
-    return set_neg_to_zero(imgs - scale * \
-        ndi.gaussian_filter(imgs.mean(axis=0), k))
+    return set_neg_to_zero(img-scale*mean_img)
 
-def sub_gauss_filt_med(imgs, k=2.0, scale=1.0):
+def sub_gauss_filt_median(img, median_img, k=2.0,
+    scale=1.0):
     """
     Subtract a Gaussian-filtered median image
-    from each frame.
-
-    **WARNING: Untested. I don't think ndarrays 
-    have the .med() method.
-
-    Parameters
-    ----------
-        imgs : 3D ndarray (TYX)
-        k : float, width of Gaussian kernel
-        scale : float, intensity modifier
-
-    Returns
-    -------
-        3D ndarray (TYX), filtered movie
+    from the present image.
 
     """
-    return set_neg_to_zero(imgs - scale * \
-        ndi.gaussian_filter(imgs.med(axis=0), k))
+    return set_neg_to_zero(img - scale * \
+        ndi.gaussian_filter(median_img, k))
 
-def sub_gauss_filt_moving_min(imgs, k=2.0, scale=1.0,
-    min_window=10):
+def sub_gauss_filt_min(img, min_img, k=2.0,
+    scale=1.0):
     """
-    Subtract a Gaussian-filtered rolling min image
-    from each frame. 
-
-    Parameters
-    ----------
-        imgs : 3D ndarray (TYX)
-        k : float, width of Gaussian kernel
-        scale : float, intensity modifier
-        min_window : int, the temporal window
-            size for minimum calculation
-
-    Returns
-    -------
-        3D ndarray (TYX), filtered movie
+    Subtract a Gaussian-filtered minimum image
+    from the present image.
 
     """
-    T, N, M = imgs.shape 
-    min_window = min([min_window, T])
+    return set_neg_to_zero(img - scale * \
+        ndi.gaussian_filter(min_img, k))
 
-    # Assign each frame to a temporal subwindow
-    nu = T // min_window 
+def sub_gauss_filt_mean(img, mean_img, k=2.0,
+    scale=1.0):
+    """
+    Subtract a Gaussian-filtered mean image
+    from the present image.
 
-    # Perform the subtraction
-    result = np.empty((T, N, M), dtype='float64')
-    for i in range(nu-1):
-        f0 = i*min_window
-        f1 = (i+1)*min_window
-        result[f0:f1] = imgs[f0:f1] - \
-            scale*ndi.gaussian_filter(
-                imgs[f0:f1].min(axis=0), k)
+    """
+    return set_neg_to_zero(img - scale * \
+        ndi.gaussian_filter(mean_img, k))
 
-    # For the last block, make sure that we're 
-    # taking a full window for the min calculation
-    f0 = T-min_window
-    f1 = T 
-    result[f0:f1] = imgs[f0:f1] - \
-        scale*ndi.gaussian_filter(
-            imgs[f0:f1].min(axis=0), k)
-
-    return result 
-
-##
-## Filtering methods currently implemented
-##
+#
+# Filtering methods currently implemented
+#
 FILTER_METHODS = {
-    'sub_med' : sub_median,
-    'sub_med_scale' : sub_scaled_median,
-    'sub_moving_min' : sub_moving_min,
-    'sub_gauss_filt_avg' : sub_gauss_filt_avg,
-    'sub_gauss_filt_med' : sub_gauss_filt_med,
-    'sub_gauss_filt_moving_min' : sub_gauss_filt_moving_min,
+    'unfiltered': unfiltered,
+    'sub_median': sub_median,
+    'sub_min': sub_min,
+    'sub_mean': sub_mean,
+    'sub_gauss_filt_median': sub_gauss_filt_median,
+    'sub_gauss_filt_min': sub_gauss_filt_min,
+    'sub_gauss_filt_mean': sub_gauss_filt_mean,
+}
+
+# 
+# The input images expected by each method
+#
+FILTER_METHOD_INPUTS = {
+    'unfiltered': 'median',
+    'sub_median': 'median',
+    'sub_min': 'min',
+    'sub_mean': 'mean',
+    'sub_gauss_filt_median': 'median',
+    'sub_gauss_filt_min': 'min',
+    'sub_gauss_filt_mean': 'mean',
 }
 
 
