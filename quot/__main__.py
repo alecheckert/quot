@@ -26,6 +26,8 @@ from quot.qio import ImageFileReader
     help='default first frame')
 @click.option('-t1', default=None, type=int,
     help='default last frame')
+@click.option('-c', '--crosshair_len', type=int, 
+    default=4, help='default 4 pixels')
 def run_gui(
     filename, 
     gui_height,
@@ -35,6 +37,7 @@ def run_gui(
     x1,
     t0,
     t1,
+    crosshair_len,
 ):
     # Check the frame limits
     reader = ImageFileReader(filename)
@@ -57,7 +60,7 @@ def run_gui(
     # Run the GUI
     gui_obj = GUI(filename, gui_height=gui_height,
         subregion=subregion, method='sub_median',
-        frame_limits=(t0, t1))
+        frame_limits=(t0, t1), crosshair_len=crosshair_len)
 
 if __name__ == '__main__':
     run_gui()

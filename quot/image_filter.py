@@ -76,6 +76,17 @@ class SubregionFilterer(object):
         self.frame_idx = 0
         self._update_block(self.frame_idx)
 
+    def __iter__(self):
+        self.c_idx = 0
+        return self 
+
+    def __next__(self):
+        if self.c_idx < self.n_frames:
+            self.c_idx += 1
+            return self.filter_frame(self.c_idx-1)
+        else:
+            raise StopIteration
+
     def _set_block_size(self, block_size):
         """
         Change the block size for this filtering

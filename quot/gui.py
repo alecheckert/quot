@@ -59,6 +59,8 @@ class GUI(object):
             frames to allow in the frame slider (can 
             be useful to look at frames closer together)
 
+        crosshair_len : int, the length of the crosshairs
+
     """
     def __init__(
         self,
@@ -67,10 +69,12 @@ class GUI(object):
         method='sub_median',
         gui_height=500,
         frame_limits=None,
+        crosshair_len=4,
     ):
         self.filename = filename
         self.gui_height = gui_height
         self.method = method 
+        self.crosshair_len = crosshair_len
 
         # Image file reader
         self.reader = ImageFileReader(self.filename)
@@ -121,9 +125,6 @@ class GUI(object):
         # Image filterer
         self.filterer = SubregionFilterer(self.reader, 
             self.subregion, self.method)
-
-        # Crosshair length, for overlaying detections
-        self.crosshair_len = 4
 
 
         ## TKINTER INTERFACE COMPARTMENTALIZATION
