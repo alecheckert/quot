@@ -35,7 +35,7 @@ class ImageFilterer(object):
 
     """
     def __init__(self, ImageFileReader, method=None, 
-        block_size=200, start_iter=0, stop_iter=None,
+        block_size=10, start_iter=0, stop_iter=None,
         **method_kwargs):
         self.ImageFileReader = ImageFileReader 
         self.method = method 
@@ -51,7 +51,7 @@ class ImageFilterer(object):
                 self.ImageFileReader)
 
         # If no method passed, default to raw movie
-        if self.method is None:
+        if (self.method is None) or (self.method=='None'):
             self.method_f = lambda x: x
 
         # Otherwise, find desired filtering method

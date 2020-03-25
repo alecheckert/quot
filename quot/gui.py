@@ -640,6 +640,7 @@ FILTER_KWARGS_DEFAULT = {
         'k': 2.0,
         'scale': 1.0
     },
+    'None': {},
 }
 
 # The mapping of filtering keyword arguments to 
@@ -647,19 +648,22 @@ FILTER_KWARGS_DEFAULT = {
 FILTER_KWARG_MAP = {
     'sub_moving_min': ['min_window', 'scale'],
     'sub_gauss_filt_avg': ['k', 'scale'],
+    'None': [],
 }
 
 # Step size of the filtering sliders S20 and S30 
 FILTER_SLIDER_RESOLUTIONS = {
     'sub_moving_min': [1, 0.1],
     'sub_gauss_filt_avg': [0.1, 0.1],
+    'None': [],
 }
 
 # Lower and upper limits for the filtering sliders
 # S20 and S30 
 FILTER_SLIDER_LIMITS = {
     'sub_moving_min': [[0, 40], [0.0, 3.0]],
-    'sub_gauss_filt_avg': [[0.0, 20.0], [0.0, 3.0]]
+    'sub_gauss_filt_avg': [[0.0, 20.0], [0.0, 3.0]],
+    'None': [[]],
 }
 
 # The detection functions, keyed by option in 

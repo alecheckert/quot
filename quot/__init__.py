@@ -3,5 +3,6 @@ __init__.py
 """
 import quot.utils
 import quot.qio
-import quot.methods
-import quot.dotfinder
+import quot.image_filter
+import quot.detect
+import quot.gui 
