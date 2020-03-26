@@ -12,6 +12,7 @@ setuptools.setup(
 		"tifffile>=0.14.0",
 		"munkres>=1.1.2",
 		"czifile>=2019.7.2",
+		"tqdm>=4.7.2-f37f9f7",
 	],
 	entry_points = {
 		'console_scripts': [
