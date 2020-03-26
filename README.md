@@ -24,7 +24,7 @@ quot --help
 
 A typical usage is 
 ```
-quot samples/sample_file.tif
+quot samples/sample_movie.tif
 ```
 
 Other options include running `quot` on a subregion of the input file, or only on specific frames.
@@ -33,10 +33,12 @@ The GUI can also be launched from within Python using the `quot.gui.GUI` class:
 ```
 from quot import gui
 
-filename = 'samples/sample_file.tif'
+filename = 'samples/sample_movie.tif'
 gui = gui.GUI(filename)
 
-# If only want to run on rectangular subregion
+# If we only want to run on rectangular subregion
 gui = gui.GUI(filename, subregion=[[100, 200], [150, 350]])
-```
 
+# If we only want to run on frames 120 through 220 
+gui = gui.GUI(filename, subregion=[[100, 200], [150, 350]], frame_limits=(120, 220))
+```

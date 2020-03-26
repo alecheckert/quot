@@ -32,9 +32,6 @@ from quot import detect
 # Utilities
 from .utils import set_neg_to_zero, overlay_spots, label_binary_spots
 
-sample_file_path = '/Users/alecheckert/Imaging/tracking/200321_eikon_standardize_loc_detect/nd2_files/WellB02_Channel561_Prime95B_Seq0000.nd2'
-sample_subregion = [[200, 400], [200, 500]]
-
 class GUI(object):
     """
 
@@ -345,7 +342,7 @@ class GUI(object):
 
         # slider S00, which informs self.frame_idx
         self.S00 = tkinter.Scale(self.frame_1, from_=self.frame_limits[0], 
-            to=self.frame_limits[1], command=self._set_frame_idx,
+            to=self.frame_limits[1]-1, command=self._set_frame_idx,
             **slider_kwargs)
         self.S00.grid(row=2, column=0, **s_grid_kwargs)
         self.S00.set(0)
@@ -933,16 +930,16 @@ DETECT_KWARGS_DEFAULT = {
     'DoG': {
         'k0': 1.5,
         'k1': 8.0,
-        't': 8.0,
+        't': 400.0,
     },
     'DoU': {
         'k0': 3,
         'k1': 9,
-        't': 8.0,
+        't': 400.0,
     },
     'simple_gauss': {
         'k': 1.0,
-        't': 10.0,
+        't': 400.0,
     }
 }
 
@@ -963,7 +960,7 @@ DETECT_SLIDER_RESOLUTIONS = {
 
 # Limits on each detection slider
 DETECT_SLIDER_LIMITS = {
-    'DoG': [[0.0, 5.0], [0.0, 15.0], [0.0, 40.0]],
-    'DoU': [[1, 11], [1, 21], [0.0, 40.0]],
-    'simple_gauss': [[0.0, 5.0], [0.0, 40.0]]
+    'DoG': [[0.0, 5.0], [0.0, 15.0], [0.0, 1000.0]],
+    'DoU': [[1, 11], [1, 21], [0.0, 1000.0]],
+    'simple_gauss': [[0.0, 5.0], [0.0, 1000.0]]
 }
