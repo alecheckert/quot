@@ -205,7 +205,16 @@ def stable_divide(N, D, inf=1.0):
     result[nonzero] = N[nonzero] / D[nonzero]
     return result
 
+def try_list_remove(a_list, *args):
+    """
+    Remove *args* from a_list, or do nothing
+    if it's not in the list.
 
+    """
+    for arg in args:
+        if arg in a_list:
+            a_list.remove(arg)
+    return a_list 
 
 
 

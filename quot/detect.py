@@ -6,11 +6,17 @@ on 2D images
 # Numerics
 import numpy as np 
 
+# Dataframes
+import pandas as pd 
+
 # Filtering utilities
 from scipy import ndimage as ndi 
 
 # File path stuff
 import os
+
+# Get the arguments to a function
+import inspect 
 
 # Find the Otsu threshold of an image
 from skimage.filters import threshold_otsu 
@@ -122,7 +128,7 @@ def dou_filter(img, k0=3, k1=9, t=None,
     if return_filt:
         return img_filt, img_bin, positions 
     else:
-        return position 
+        return positions 
 
 def gauss_filter(img, k=1.0, t=None,
     return_filt=True):
@@ -172,7 +178,7 @@ def gauss_filter(img, k=1.0, t=None,
     if return_filt:
         return img_filt, img_bin, positions 
     else:
-        return position 
+        return positions 
 
 def gauss_filter_sq(img, k=1.0, t=None,
     return_filt=True):
@@ -219,7 +225,7 @@ def gauss_filter_sq(img, k=1.0, t=None,
     if return_filt:
         return img_filt, img_bin, positions 
     else:
-        return position 
+        return positions 
 
 
 def min_max_filter(img, w=9, t=None, mode='constant',
@@ -273,7 +279,7 @@ def min_max_filter(img, w=9, t=None, mode='constant',
     if return_filt:
         return img_filt, img_bin, positions 
     else:
-        return position 
+        return positions 
 
 def llr(img, w=9, k=1.0, t=None, return_filt=True):
     """
@@ -364,7 +370,7 @@ def llr(img, w=9, k=1.0, t=None, return_filt=True):
     if return_filt:
         return img_filt, img_bin, positions 
     else:
-        return position 
+        return positions
 
 def simple_threshold(img, t=None, return_filt=True):
     """
@@ -398,12 +404,93 @@ def simple_threshold(img, t=None, return_filt=True):
 
     # Find spots 
     positions = utils.label_binary_spots(
-        img, img_int=img)
+        img_bin, img_int=img)
 
     if return_filt:
         return img, img_bin, positions 
     else:
-        return position
+        return positions
+
+DETECT_METHODS = {
+    'DoG': dog_filter,
+    'DoU': dou_filter,
+    'simple_gauss': gauss_filter,
+    'simple_gauss_squared': gauss_filter_sq,
+    'min/max': min_max_filter,
+    'LLR': llr,
+    'simple_threshold': simple_threshold,
+}
+
+def prune_kwargs(function, **kwargs):
+    """
+    For one of the detection functions, remove 
+    kwargs that are not taken by that function.
+
+    This is not currently used - if the config
+    files are written correctly, it should not
+    be necessary.
+
+    args
+    ----
+        function : one of the detection 
+            functions
+
+        kwargs : proposed kwargs to function
+
+    returns
+    -------
+        dict, revised kwargs
+
+    """
+    # Get the list of all arguments
+    arglist = inspect.getargspec(function).args 
+
+    # Remove the 'img' and 'return_filt' arguments
+    arglist = utils.try_list_remove(arglist, 'img', 'return_filt')
+
+    # Return the modified dictionary
+    return {i: kwargs[i] for i in kwargs.keys() if i in arglist}
+
+def detect(img, method=None, **kwargs):
+    """
+    Run a detection method on an image.
+
+    args
+    ----
+        img : 2D ndarray, input image
+        method : str, a detection method
+        kwargs : to method
+
+    returns
+    -------
+        2D ndarray of shape (n_points, 2), 
+            the coordinates of the detected
+            spots
+
+    """
+    # Make sure a viable method is passed
+    if method is None:
+        raise RuntimeError("quot.detect.detect: no " \
+            "detection passed; will not run detection")
+
+    # Find the corresponding detection method
+    try:
+        detect_f = DETECT_METHODS[method]
+    except KeyError:
+        raise RuntimeError("quot.detect.detect: method " \
+            "%s not available; options are %s" % \
+            (method, ", ".join(DETECT_METHODS.keys())))
+
+    # Run the detection method
+    positions = detect_f(img, return_filt=False, **kwargs)
+
+    # Format output as dataframe
+    if len(positions.shape) < 2:
+        return pd.DataFrame(index=[], columns=['yd', 'xd'])
+    else:
+        return pd.DataFrame(positions, columns=['yd', 'xd'])
+
+
 
 
 

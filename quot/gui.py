@@ -125,7 +125,7 @@ class GUI(object):
 
         # Image filterer
         self.filterer = SubregionFilterer(self.reader, 
-            self.subregion, self.method)
+            subregion=self.subregion, method=self.method)
 
 
         ## TKINTER INTERFACE COMPARTMENTALIZATION
@@ -651,7 +651,7 @@ class GUI(object):
             'filtering': {
                 'method': self.filter_type.get(),
                 'block_size': self.block_size_var.get(),
-                **self.detect_kwargs,
+                **self.filter_kwargs,
             },
             'detection': {
                 'method': self.detect_type.get(),

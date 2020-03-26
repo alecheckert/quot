@@ -43,13 +43,21 @@ class SubregionFilterer(object):
         **method_kwargs : to the filtering method
 
     """
-    def __init__(self, ImageFileReader, subregion,
-        method=None, block_size=100, **filter_kwargs):
+    def __init__(self, ImageFileReader, subregion=None,
+        method=None, block_size=100, start_iter=0,
+        stop_iter=None, **filter_kwargs):
         self.ImageFileReader = ImageFileReader 
-        self.subregion = subregion
         self.method = method 
         self.block_size = block_size
         self.filter_kwargs = filter_kwargs
+
+        # If no subregion passed, default to the whole
+        # frame
+        if subregion is None:
+            self.subregion = [[0, self.ImageFileReader.height],
+                [0, self.ImageFileReader.width]]
+        else:
+            self.subregion = subregion 
 
         # Determine whether the subregion limits are
         # valid for this reader
@@ -69,19 +77,27 @@ class SubregionFilterer(object):
 
         # Get the movie length and shape 
         self.n_frames = self.ImageFileReader.n_frames 
-        self.height = subregion[0][1] - subregion[0][0]
-        self.width = subregion[1][1] - subregion[1][0]
+        self.height = self.subregion[0][1] - self.subregion[0][0]
+        self.width = self.subregion[1][1] - self.subregion[1][0]
+
+        # Save the frames at which to start / stop iteration
+        if start_iter is None:
+            start_iter = 0
+        if stop_iter is None:
+            stop_iter = self.n_frames 
+        self.start_iter = start_iter 
+        self.stop_iter = stop_iter 
 
         # Set the initial frame to zero
         self.frame_idx = 0
         self._update_block(self.frame_idx)
 
     def __iter__(self):
-        self.c_idx = 0
+        self.c_idx = self.start_iter 
         return self 
 
     def __next__(self):
-        if self.c_idx < self.n_frames:
+        if self.c_idx < self.stop_iter:
             self.c_idx += 1
             return self.filter_frame(self.c_idx-1)
         else:

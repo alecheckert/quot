@@ -14,6 +14,8 @@ setuptools.setup(
 		"czifile>=2019.7.2",
 	],
 	entry_points = {
-		'console_scripts': ['quot=quot.__main__:run_gui'],
+		'console_scripts': [
+			'quot=quot.__main__:cli',
+		],
 	},
 )

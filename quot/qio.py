@@ -45,7 +45,7 @@ def read_config(path):
 
     """
     with open(path, 'r') as f:
-        return yaml.save_load(f)
+        return yaml.safe_load(f)
 
 class ImageFileReader(object):
     def __init__(self, file_name, start_iter=0,
