@@ -8,11 +8,44 @@ import numpy as np
 # File path manipulations
 import os
 
+# Config files
+import yaml 
+
 # Underlying readers for various image
 # file formats
 import tifffile
 from nd2reader import ND2Reader 
 from czifile import CziFile 
+
+def save_config(out_yaml, in_dict):
+    """
+    Save data in a dictionary to a YAML 
+    file.
+
+    args
+    ----
+        out_yaml : str, .yaml file path
+        in_dict : dict, settings to be saved
+
+    """
+    with open(out_yaml, 'w') as o:
+        o.write(yaml.dump(in_dict))
+
+def read_config(path):
+    """
+    Read config settings from a .yaml file.
+
+    args
+    ----
+        path : str, path to .yaml file
+
+    returns
+    -------
+        dict, the config settings for detection
+
+    """
+    with open(path, 'r') as f:
+        return yaml.save_load(f)
 
 class ImageFileReader(object):
     def __init__(self, file_name, start_iter=0,

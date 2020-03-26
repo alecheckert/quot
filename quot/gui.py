@@ -4,6 +4,10 @@ gui.py
 """
 # tkinter GUI
 import tkinter 
+from tkinter import filedialog 
+
+# File paths 
+import os 
 
 # Numeric
 import numpy as np 
@@ -21,7 +25,7 @@ from scipy import ndimage as ndi
 from copy import copy 
 
 # File reader 
-from quot.qio import ImageFileReader 
+from quot import qio 
 
 # Image filtering/BG subtraction utilities
 from quot.image_filter import SubregionFilterer
@@ -74,7 +78,7 @@ class GUI(object):
         self.crosshair_len = crosshair_len
 
         # Image file reader
-        self.reader = ImageFileReader(self.filename)
+        self.reader = qio.ImageFileReader(self.filename)
         self.n_frames, self.N, self.M = self.reader.get_shape()
 
         # If no subregion is passed, default to the full frame
@@ -232,12 +236,26 @@ class GUI(object):
         self.M2.grid(row=1, column=2, pady=5, padx=5)
 
         # Button to show detections, if desired
+        button_kwargs = {
+            'activeforeground': '#dadde5',
+            'activebackground': '#455462',
+        }
         self.B0 = tkinter.Button(self.frame_1, text='Overlay detections',
-            command=self._overlay_detections_callback)
+            command=self._overlay_detections_callback, **button_kwargs)
         self.B0.grid(row=2, column=2, pady=5, padx=5)
 
         # The current state of this button
         self.B0_state = False 
+
+        # Button to resize the threshold bar
+        self.B1 = tkinter.Button(self.frame_1, text='Rescale threshold',
+            command=self._rescale_threshold_callback, **button_kwargs)
+        self.B1.grid(row=3, column=2, pady=5, padx=5)
+
+        # Button to save the current configurations
+        self.B2 = tkinter.Button(self.frame_1, text='Save current settings',
+            command=self._save_settings_callback, **button_kwargs)
+        self.B2.grid(row=4, column=2, pady=5, padx=5)
 
 
         ## SLIDER LABELS, which change in response to 
@@ -455,6 +473,12 @@ class GUI(object):
         self._regenerate_primary_photo()
         self._regenerate_photos()
 
+    def _rescale_threshold_callback(self, *args):
+        self._rescale_threshold()
+
+    def _save_settings_callback(self, *args):
+        self._save_settings()
+
     def _update_filter_sliders(self):
         """
         Use the current value of self.filter_type to 
@@ -573,6 +597,70 @@ class GUI(object):
         self._filter()
         self._detect()
         self._regenerate_photos()
+
+    def _rescale_threshold(self):
+        """
+        Rescale the threshold slider to match the min/max 
+        of the current filtered image.
+
+        The identity of the threshold slider (i.e. which of
+        self.S01 through self.S31 is assigned the threshold
+        kwarg) will depend on the detection method.
+
+        """
+        # The current detection method
+        v = self.detect_type.get()
+
+        # Figure out if the current detection method 
+        # admits a threshold ('t') kwarg. If not, do nothing.
+        try:
+            # The slider index corresponding to the threshold
+            s_idx = DETECT_KWARG_MAP[v].index('t')
+
+            # Set the limits of the corresponding slider to 
+            # the minimum and maximum values of the current
+            # filtered image (self.img_10)
+            [self.S01, self.S11, self.S21, self.S31][s_idx].configure(
+                from_=int(np.floor(self.img_10.min())),
+                to=int(np.ceil(self.img_10.max()))
+            )
+        except ValueError:
+            pass
+
+    def _save_settings(self):
+        """
+        Prompt the user to enter a filename to save 
+        the current detection settings.
+
+        """
+        # Choose the default directory prompt
+        if hasattr(self, 'save_file'):
+            initialdir = os.path.dirname(self.save_file)
+        else:
+            initialdir = os.getcwd()
+
+        # Launch the file dialog GUI
+        self.save_file = filedialog.asksaveasfilename(
+            parent=self.root,
+            initialdir=initialdir,
+            defaultextension='.yaml',
+        )
+
+        # Format config settings for filtering and detection
+        settings = {
+            'filtering': {
+                'method': self.filter_type.get(),
+                'block_size': self.block_size_var.get(),
+                **self.detect_kwargs,
+            },
+            'detection': {
+                'method': self.detect_type.get(),
+                **self.detect_kwargs,
+            },
+        }
+
+        # Save
+        qio.save_config(self.save_file, settings)
 
     def _filter(self):
         """
@@ -794,13 +882,19 @@ def img_to_rgb(img, expand=1, vmax=255.0, vmin=0.0):
             img.shape[1], 4)
 
     """
-    # Rescale to 8-bit
+    # Adjust intensities to fit in 0-255 range
     img_re = (img.astype('float64')*255.0/ \
         max([img.max(),1]))
     img_re = set_neg_to_zero(img_re-vmin)
-    img_re = img_re * 255.0 / vmax 
-    img_re[img_re > 255.0] = 255.0
-    img_re = img_re.astype('uint8')
+
+    # If vmax is below the minimum intensity,
+    # return all 255. Else rescale.
+    if vmax < img_re.min():
+        img_re = np.full(img.shape, 255, dtype='uint8')
+    else:
+        img_re = img_re * 255.0 / vmax 
+        img_re[img_re > 255.0] = 255.0
+        img_re = img_re.astype('uint8')
     N, M = img_re.shape 
 
     # Make RGB rep
@@ -864,12 +958,6 @@ def find_and_overlay_spots(img, img_bin, crosshair_len=4):
         crosshair_len=crosshair_len)
     return result 
 
-
-def set_neg_to_zero(ndarray):
-    ndarray[ndarray < 0.0] = 0
-    return ndarray 
-
-
 # Default parameter sets when changing to a different
 # filtering method
 FILTER_KWARGS_DEFAULT = {
@@ -923,6 +1011,10 @@ DETECT_METHODS = {
     'DoG': detect.dog_filter,
     'DoU': detect.dou_filter,
     'simple_gauss': detect.gauss_filter,
+    'simple_gauss_squared': detect.gauss_filter_sq,
+    'min/max': detect.min_max_filter,
+    'LLR': detect.llr,
+    'simple_threshold': detect.simple_threshold,
 }
 
 # Default arguments to each detection function
@@ -940,7 +1032,23 @@ DETECT_KWARGS_DEFAULT = {
     'simple_gauss': {
         'k': 1.0,
         't': 400.0,
-    }
+    },
+    'simple_gauss_squared': {
+        'k': 1.0,
+        't': 400.0,        
+    },
+    'min/max': {
+        'w': 9,
+        't': 400.0,
+    },
+    'LLR': {
+        'w': 9,
+        'k': 1.0,
+        't': 400.0,
+    },
+    'simple_threshold': {
+        't': 400.0,        
+    },
 }
 
 # The mapping of detection keyword arguments to 
@@ -949,6 +1057,10 @@ DETECT_KWARG_MAP = {
     'DoG': ['k0', 'k1', 't'],
     'DoU': ['k0', 'k1', 't'],
     'simple_gauss': ['k', 't'],
+    'simple_gauss_squared': ['k', 't'],
+    'min/max': ['w', 't'],
+    'LLR': ['w', 'k', 't'],
+    'simple_threshold': ['t'],
 }
 
 # Step size of the detection sliders
@@ -956,11 +1068,19 @@ DETECT_SLIDER_RESOLUTIONS = {
     'DoG': [0.1, 0.25, 0.1],
     'DoU': [1, 1, 0.1],
     'simple_gauss': [0.1, 0.1],
+    'simple_gauss_squared': [0.1, 0.1],
+    'min/max': [1, 0.1],
+    'LLR': [1, 0.1, 0.1],
+    'simple_threshold': [0.1],
 }
 
 # Limits on each detection slider
 DETECT_SLIDER_LIMITS = {
     'DoG': [[0.0, 5.0], [0.0, 15.0], [0.0, 1000.0]],
     'DoU': [[1, 11], [1, 21], [0.0, 1000.0]],
-    'simple_gauss': [[0.0, 5.0], [0.0, 1000.0]]
+    'simple_gauss': [[0.0, 5.0], [0.0, 1000.0]],
+    'simple_gauss_squared': [[0.0, 5.0], [0.0, 1000.0]],
+    'min/max': [[1, 21], [0.0, 1000.0]],
+    'LLR': [[1, 21], [0.1, 3.0], [0.0, 1000.0]],
+    'simple_threshold': [[0.0, 1000.0]],
 }
