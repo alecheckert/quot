@@ -1,2 +1,2 @@
 # quot
-Many ways to find dots in fluorescence microscopy images
+A simple Python-based GUI for visually comparing spot detection methods in single molecule microscopy data
