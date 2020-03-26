@@ -131,6 +131,7 @@ class GUI(object):
 
         # Instantiate the main tkinter interface
         self.root = tkinter.Tk()
+        self.root.title("quot")
 
         # Master frame, containing both the upper
         # frame (self.frame_0) for images and the

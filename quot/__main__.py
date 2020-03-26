@@ -1,4 +1,4 @@
-#!/anaconda3/bin/python
+#!/usr/bin/env python 
 """
 __main__.py
 
