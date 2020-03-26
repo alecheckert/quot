@@ -1,2 +1,2 @@
 # quot
-Many ways to find dots in fluorescence microscopy images
+A simple GUI to compare spot detection methods in single molecule microscopy data
