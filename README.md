@@ -1,2 +1,2 @@
 # quot
-A simple Python-based GUI for visually comparing spot detection methods in single molecule microscopy data
+A simple GUI to compare spot detection methods in single molecule microscopy data
