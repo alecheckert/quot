@@ -15,9 +15,6 @@ from scipy import ndimage as ndi
 # File path stuff
 import os
 
-# Get the arguments to a function
-import inspect 
-
 # Find the Otsu threshold of an image
 from skimage.filters import threshold_otsu 
 
@@ -421,36 +418,6 @@ DETECT_METHODS = {
     'simple_threshold': simple_threshold,
 }
 
-def prune_kwargs(function, **kwargs):
-    """
-    For one of the detection functions, remove 
-    kwargs that are not taken by that function.
-
-    This is not currently used - if the config
-    files are written correctly, it should not
-    be necessary.
-
-    args
-    ----
-        function : one of the detection 
-            functions
-
-        kwargs : proposed kwargs to function
-
-    returns
-    -------
-        dict, revised kwargs
-
-    """
-    # Get the list of all arguments
-    arglist = inspect.getargspec(function).args 
-
-    # Remove the 'img' and 'return_filt' arguments
-    arglist = utils.try_list_remove(arglist, 'img', 'return_filt')
-
-    # Return the modified dictionary
-    return {i: kwargs[i] for i in kwargs.keys() if i in arglist}
-
 def detect(img, method=None, **kwargs):
     """
     Run a detection method on an image.
@@ -463,9 +430,9 @@ def detect(img, method=None, **kwargs):
 
     returns
     -------
-        2D ndarray of shape (n_points, 2), 
-            the coordinates of the detected
-            spots
+        pandas.DataFrame with columns `yd`
+            and `xd`, the coordinates of 
+            the detections
 
     """
     # Make sure a viable method is passed

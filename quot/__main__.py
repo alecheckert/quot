@@ -115,7 +115,7 @@ def loc(
         out_f = '%s_locs.csv' % os.path.splitext(f)[0]
 
         # Run localization
-        locs = localize.loc_file(f, config_file, t0=t0, 
+        locs = localize.localize_file(f, config_file, t0=t0, 
             t1=t1, verbose=verbose)
 
         # Save 
