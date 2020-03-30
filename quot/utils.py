@@ -756,8 +756,8 @@ def rs(psf_image):
 def L_poisson(psf_img, pars, sigma=1.0):
     """
     Compute the model, Jacobian, and Hessian 
-    of a 2D Gaussian PSF under a Poisson noise
-    model, given a real image. 
+    of a 2D integrated Gaussian PSF under a Poisson 
+    noise model, given a real image. 
 
     Used internally in quot.localize.mle_poisson.
 
@@ -848,9 +848,127 @@ def L_poisson(psf_img, pars, sigma=1.0):
 
     return model, J, H 
 
+def J_int_gaussian(psf_img, pars, sigma=1.0):
+    """
+    Evaluate the model function and Jacobian
+    of a 2D integrated Gaussian PSF model
+    under a Gaussian noise model, appropriate
+    for nonlinear LS optimizers.
 
+    This model uses the following parameter vector:
 
+        pars[0] : y center
+        pars[1] : x center
+        pars[2] : Gaussian intensity
+        pars[3] : BG intensity / pixel
 
+    The sigma of the Gaussian is assumed constant.
+
+    args
+    ----
+        psf_img : 2D ndarray
+        pars : 1D ndarray, parameter vector
+        sigma : float
+
+    returns
+    -------
+        (
+            2D ndarray, the evaluated PSF model;
+            2D ndarray of shape (n_pixels, 4), the
+                Jacobian
+        )
+
+    """
+    # Number of pixels
+    M = psf_img.shape[0] * psf_img.shape[1]
+
+    # Pixel indices
+    Y, X = np.indices(psf_img.shape)
+
+    # Normalization
+    var2 = 2 * (sigma**2)
+
+    # Evaluate the intensities of a unit-intensity
+    # Gaussian projected onto each axis 
+    E_y = psf_int_1d(Y, pars[0], sigma=sigma)
+    E_x = psf_int_1d(X, pars[1], sigma=sigma)
+
+    # Evaluate the model function
+    model = pars[2]*E_y*E_x + pars[3]
+
+    # Evaluate residuals with respect to model function
+    r = (model - psf_img).ravel()
+
+    # Evaluate the derivatives of the projected 
+    # Gaussian with respect to their axes
+    dEy_dy = (np.exp(-((Y-pars[0]-0.5)**2)/var2) - \
+        np.exp(-((Y-pars[0]+0.5)**2)/var2))/(np.pi*var2)
+    dEx_dx = (np.exp(-((X-pars[1]-0.5)**2)/var2) - \
+        np.exp(-((X-pars[1]+0.5)**2)/var2))/(np.pi*var2)   
+
+    # Evaluate the Jacobian
+    J = np.empty((M, 4), dtype='float64')
+    J[:,0] = (pars[2] * E_x * dEy_dy).ravel()
+    J[:,1] = (pars[2] * E_y * dEx_dx).ravel()
+    J[:,2] = (E_y * E_x).ravel()
+    J[:,3] = np.ones(M, dtype='float64')
+
+    return model, J 
+
+def J_point_gaussian(psf_img, pars, sigma=1.0):
+    """
+    Evaluate the model function and Jacobian
+    of a 2D pointwise Gaussian PSF model
+    under a Gaussian noise model, appropriate
+    for nonlinear LS optimizers.
+
+    This model uses the following parameter vector:
+
+        pars[0] : y center
+        pars[1] : x center
+        pars[2] : Gaussian intensity
+        pars[3] : BG intensity / pixel
+
+    The sigma of the Gaussian is assumed constant.
+
+    args
+    ----
+        psf_img : 2D ndarray
+        pars : 1D ndarray, parameter vector
+        sigma : float
+
+    returns
+    -------
+        (
+            2D ndarray, the evaluated PSF model;
+            2D ndarray of shape (n_pixels, 4), the
+                Jacobian
+        )
+
+    """
+    # Number of pixels
+    M = psf_img.shape[0] * psf_img.shape[1]
+
+    # Pixel indices
+    Y, X = np.indices(psf_img.shape)
+
+    # Normalization 
+    var2 = 2 * (sigma**2)
+
+    # Evaluate a unit-intensity Gaussian
+    U = np.exp(-((Y-pars[0])**2 + (X-pars[1])**2)/var2) / (var2*np.pi)
+
+    # Evaluate the model
+    model = pars[2]*U + pars[3]
+
+    # Evaluate the Jacobian
+    J = np.empty((M, 4), dtype='float64')
+    J[:,0] = ((Y-pars[0])*pars[2]*U/(sigma**2)).ravel()
+    J[:,1] = ((X-pars[1])*pars[2]*U/(sigma**2)).ravel()
+    J[:,2] = U.ravel()
+    J[:,3] = np.ones(M, dtype='float64')
+
+    return model, J 
 
 #
 # MISCELLANEOUS UTILITIES
@@ -905,7 +1023,7 @@ def wireframe_overlay(*imgs):
     colors = ['k', 'r', 'b']
 
     fig = plt.figure(figsize=(4, 4))
-    ax = fig.add_subplot(projection='3d')
+    ax = fig.add_subplot(111, projection='3d')
     for j, img in enumerate(imgs):
         Y, X = np.indices(img.shape)
         if j < 3:

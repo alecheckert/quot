@@ -140,7 +140,7 @@ def radial_symmetry(psf_img, sigma=1.0, camera_offset=0.0,
 def mle_poisson(psf_img, sigma=1.0, max_iter=20,
     damp=0.3, camera_offset=0.0, camera_gain=1.0,
     convergence_crit=3.0e-5, ridge=1.0e-4, 
-    debug=False):
+    debug=False, divergence_crit=1.0):
     """
     Estimate the maximum likelihood model 
     parameters for an integrated 2D Gaussian
@@ -256,7 +256,10 @@ def mle_poisson(psf_img, sigma=1.0, max_iter=20,
         ('I', pars[2]), ('bg', pars[3]), ('amp', amp),
         ('snr', snr), ('converged', converged)))
 
-def ls_int_gaussian(psf_img, sigma=1.0):
+def ls_int_gaussian(psf_img, sigma=1.0, max_iter=20,
+    camera_gain=1.0, camera_offset=0.0, damp=0.3,
+    convergence_crit=1.0e-5, divergence_crit=0.5,
+    debug=False):
     """
     Find the least-squares estimate for the parameters
     of an integrated 2D Gaussian PSF model, given
@@ -280,9 +283,76 @@ def ls_int_gaussian(psf_img, sigma=1.0):
         }
 
     """
-    pass
+    # Subtract BG and divide out gain 
+    psf_img = utils.rescale_img(psf_img,
+        camera_offset=camera_offset,
+        camera_gain=camera_gain)
 
-def ls_point_gaussian(psf_img, sigma=1.0):
+    # Make initial parameter guesses with the
+    # radial symmetry method
+    guess = radial_symmetry(psf_img, sigma=sigma)
+
+    # Current parameter estimate
+    pars = np.array([guess['y0'], guess['x0'], 
+        guess['I'], guess['bg']])
+
+    # Update to the current parameters, used to
+    # call convergence
+    update = np.ones(4, dtype='float64')
+
+    iter_idx = 0
+    while iter_idx < max_iter: 
+
+        # If converging, terminate
+        if (np.abs(update[:2]) < convergence_crit).all():
+            break 
+
+        # Calculate PSF and Jacobian under the present
+        # model
+        model, J = utils.J_int_gaussian(psf_img, 
+            pars, sigma=sigma)
+
+        # Calculate the residuals
+        r = (model - psf_img).ravel()
+
+        # Get the new update vector
+        update = np.linalg.inv(J.T @ J) @ (J.T @ r)
+
+        # Apply the new update vector
+        if debug:
+            print(pars)
+            utils.wireframe_overlay(psf_img, model)
+
+        pars = pars - damp * update 
+        iter_idx += 1
+
+    # If not converged, fall back to initial guess (radial
+    # symmetry method)
+    if (update[:2] >= divergence_crit).any():
+        pars = np.array([guess['y0'], guess['x0'],
+            guess['I'], guess['bg']])
+        converged = False
+    else:
+        converged = True 
+
+    # Estimate peak amplitude of Gaussian
+    amp = utils.amp_from_I(pars[2], sigma=sigma)
+
+    # Estimate SNR
+    snr = utils.estimate_snr(psf_img, amp)
+
+    if debug:
+        print(pars)
+        utils.wireframe_overlay(psf_img, model)
+
+    return dict((('y0', pars[0]), ('x0', pars[1]), \
+        ('I', pars[2]), ('bg', pars[3]), ('amp', amp),
+        ('snr', snr), ('converged', converged)))
+
+def ls_point_gaussian(psf_img, sigma=1.0, max_iter=20,
+    camera_gain=1.0, camera_offset=0.0, damp=0.3,
+    convergence_crit=1.0e-5, divergence_crit=0.5,
+    debug=False):
     """
     Find the least-squares estimate for the parameters
     of a pointwise-evaluated 2D Gaussian PSF model,
@@ -298,6 +368,17 @@ def ls_point_gaussian(psf_img, sigma=1.0):
     ----
         psf_img : 2D ndarray
         sigma : float, width of 2D Gaussian
+        max_iter : int
+        camera_gain : float
+        camera_offset : float
+        damp : float, damping factor for 
+            parameter updates 
+        convergence_crit : float, the criterion
+            for fit convergence (y0, x0)
+        divergence_crit : float, the criterion
+            for fit divergence (y0, x0)
+        debug : bool, show intermediate steps
+            and plot PSF model at each iteration
 
     returns
     -------
@@ -311,7 +392,71 @@ def ls_point_gaussian(psf_img, sigma=1.0):
         }
 
     """
-    pass
+    # Subtract BG and divide out gain 
+    psf_img = utils.rescale_img(psf_img,
+        camera_offset=camera_offset,
+        camera_gain=camera_gain)
+
+    # Make initial parameter guesses with the
+    # radial symmetry method
+    guess = radial_symmetry(psf_img, sigma=sigma)
+
+    # Current parameter estimate
+    pars = np.array([guess['y0'], guess['x0'], 
+        guess['I'], guess['bg']])
+
+    # Update to the current parameters, used to
+    # call convergence
+    update = np.ones(4, dtype='float64')
+
+    iter_idx = 0
+    while iter_idx < max_iter: 
+
+        # If converging, terminate
+        if (np.abs(update[:2]) < convergence_crit).all():
+            break 
+
+        # Calculate PSF and Jacobian under the present
+        # model
+        model, J = utils.J_point_gaussian(psf_img, 
+            pars, sigma=sigma)
+
+        # Calculate the residuals
+        r = (model - psf_img).ravel()
+
+        # Get the new update vector
+        update = np.linalg.inv(J.T @ J) @ (J.T @ r)
+
+        # Apply the new update vector
+        if debug:
+            print(pars)
+            utils.wireframe_overlay(psf_img, model)
+
+        pars = pars - damp * update 
+        iter_idx += 1
+
+    # If not converged, fall back to initial guess (radial
+    # symmetry method)
+    if (update[:2] >= divergence_crit).any():
+        pars = np.array([guess['y0'], guess['x0'],
+            guess['I'], guess['bg']])
+        converged = False
+    else:
+        converged = True 
+
+    # Estimate peak amplitude of Gaussian
+    amp = utils.amp_from_I(pars[2], sigma=sigma)
+
+    # Estimate SNR
+    snr = utils.estimate_snr(psf_img, amp)
+
+    if debug:
+        print(pars)
+        utils.wireframe_overlay(psf_img, model)
+
+    return dict((('y0', pars[0]), ('x0', pars[1]), \
+        ('I', pars[2]), ('bg', pars[3]), ('amp', amp),
+        ('snr', snr), ('converged', converged)))
 
 def ls_log_gaussian(psf_img, sigma=1.0, camera_bg=0.0,
     camera_gain=1.0):

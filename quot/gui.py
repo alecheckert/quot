@@ -13,6 +13,8 @@ import os
 import numpy as np 
 
 # Plotting
+import matplotlib
+matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt 
 
 # Pillow-style images, expected by tkinter
@@ -71,6 +73,7 @@ class GUI(object):
         gui_height=500,
         frame_limits=None,
         crosshair_len=4,
+        root=None,
     ):
         self.filename = filename
         self.gui_height = gui_height
@@ -131,8 +134,11 @@ class GUI(object):
         ## TKINTER INTERFACE COMPARTMENTALIZATION
 
         # Instantiate the main tkinter interface
-        self.root = tkinter.Tk()
-        self.root.title("quot")
+        if root is None:
+            self.root = tkinter.Tk()
+        else:
+            self.root = root 
+        self.root.title("Optimize detection")
 
         # Master frame, containing both the upper
         # frame (self.frame_0) for images and the
@@ -865,6 +871,274 @@ class GUI(object):
             self.image_pos[3][1],
             image=self.photo_11,
             anchor=tkinter.NW)
+
+class MainGUI(object):
+    """
+    The main GUI. A list of options to launch various sub-
+    GUIs.
+
+    """
+    def __init__(self, gui_size=200):
+        self.gui_size = gui_size
+
+        # The directory to use in file dialogs;
+        # initially set to current directory
+        self.curr_dir = os.getcwd()
+
+        # Make the main tkinter interface
+        self.root = tkinter.Tk()
+        self.root.title("quot")
+
+        # Master frame, for organization of buttons
+        self.frame = tkinter.Frame(self.root,
+            height=self.gui_size, width=self.gui_size)
+        self.frame.pack()
+
+        # Main label
+        self.L0 = tkinter.Label(self.frame,
+            text='quot: SPT detection/tracking optimization',
+            font=('Helvetica', 16))
+        self.L0.grid(row=0, column=0, pady=10, padx=10)
+
+        # Button formatting kwargs
+        button_kwargs = {'activeforeground': '#dadde5',
+            'activebackground': '#455462'}
+        button_grid_kwargs = {'pady': 10, 'padx': 10,
+            'sticky': tkinter.NW}
+
+        # Button to start GUI(), the detection optimizer
+        self.B0 = tkinter.Button(self.frame, text='Launch detection optimizer',
+            command=self._b0_callback, **button_kwargs)
+        self.B0.grid(row=1, column=0, **button_grid_kwargs)
+
+        # Button to launch LocalizeGUI(), the localization
+        # interface
+        self.B1 = tkinter.Button(self.frame, text='Launch localization',
+            command=self._b1_callback, **button_kwargs)
+        self.B1.grid(row=2, column=0, **button_grid_kwargs)
+
+        # Button to launch QCGUI(), the QC interface
+        self.B2 = tkinter.Button(self.frame, text='Launch spot QC',
+            command=self._b2_callback, **button_kwargs)
+        self.B2.grid(row=3, column=0, **button_grid_kwargs)
+
+        # Button to launch TrackGUI(), the tracking interface
+        self.B3 = tkinter.Button(self.frame, text='Launch tracking optimizer',
+            command=self._b3_callback, **button_kwargs)
+        self.B3.grid(row=4, column=0, **button_grid_kwargs)
+
+        # Main loop
+        self.root.mainloop()
+
+    def _b0_callback(self, *args):
+        """
+        Action to execute upon pressing button self.B1.
+        Opens a file dialog for the user to select a file
+        or directory for detection optimization.
+
+        """
+        # Prompt the user to enter a file
+        self.curr_file = filedialog.askopenfilename(
+            initialdir=self.curr_dir, 
+            title='Select file for detection optimization',
+        )
+
+        # Try to open the file
+        reader = qio.ImageFileReader(self.curr_file)
+
+        # Save the parent directory of this file for
+        # any future dialogs
+        self.curr_dir = os.path.dirname(self.curr_file)
+
+        # Start a new Toplevel object for the GUI subwindow
+        self.top = tkinter.Toplevel()
+
+        # Launch the GUI with the file
+        GUI(self.curr_file, root=self.top)
+
+    def _b1_callback(self, *args):
+        """
+        Action to execute upon pressing button self.B1.
+        Opens a file dialog for the user to select a file
+        or directory for localization.
+
+        """
+        # Start a new Toplevel object for the GUI subwindow
+        self.top = tkinter.Toplevel()
+
+        # Prompt the user to enter a file or directory
+        LocalizeGUI(root=self.top, curr_dir=self.curr_dir)
+
+    def _b2_callback(self, *args):
+        """
+        Action to execute upon pressing button self.B2.
+        Opens a dialog for the user to run quality control
+        actions on localized spots.
+
+        NOT YET IMPLEMENTED.
+
+        """
+        pass 
+
+        # # Start a new Toplevel object for the GUI subwindow
+        # self.top = tkinter.Toplevel()
+
+        # # Prompt the user to enter a file or directory
+        # QCGUI(self.curr_dir, root=self.top)
+
+    def _b3_callback(self, *args):
+        pass
+
+class LocalizeGUI(object):
+    """
+    GUI for the user to run localization on a file or 
+    set of files.
+
+    init
+    ----
+        root : either None, if launching as a standalone GUI,
+            or a tkinter.Toplevel object if launching from
+            another tkinter GUI
+
+    """
+    def __init__(self, root=None, curr_dir=None, gui_size=200):
+        self.gui_size = gui_size 
+
+        # Instantiate the main tkinter window, creating
+        # a root if there are no parent GUIs
+        if root is None:
+            self.root = tkinter.Tk()
+        else:
+            self.root = root 
+        self.root.title("Localization")
+
+        # The directory that menus start in 
+        if curr_dir is None:
+            self.curr_dir = os.getcwd()
+        else:
+            self.curr_dir = curr_dir 
+
+        # Format kwargs
+        button_kwargs = {'activeforeground': '#dadde5',
+            'activebackground': '#455462'}
+        button_grid_kwargs = {'pady': 5, 'padx': 5,
+            'sticky': tkinter.NW}
+        label_kwargs = {'sticky': tkinter.NW, 'pady': 5,
+            'padx': 5}
+
+        # Frame for organizing widgets
+        self.frame = tkinter.Frame(self.root,
+            height=self.gui_size, width=self.gui_size)
+        self.frame.pack()
+
+        # Label L0: Section 1
+        self.L0 = tkinter.Label(self.frame,
+            text='1. Select ND2/TIF files for localization',
+            font=('Helvetica', 16))
+        self.L0.grid(row=0, column=0, **label_kwargs)
+
+        # Button B0: select files
+        self.B0 = tkinter.Button(self.frame, text='Select file',
+            command=self._b0_callback, **button_kwargs)
+        self.B0.grid(row=1, column=0, **button_grid_kwargs)
+
+        # Button B1: select directory
+        self.B1 = tkinter.Button(self.frame, text='Select directory',
+            command=self._b1_callback, **button_kwargs)
+        self.B1.grid(row=2, column=0, **button_grid_kwargs)
+
+        # Label L1: show currently selected file/directory
+        self.L1_var = tkinter.StringVar(self.root)
+        self.L1_var.set("None")
+        self.L1 = tkinter.Label(self.frame,
+            textvariable=self.L1_var)
+        self.L1.grid(row=3, column=0, **label_kwargs)
+
+        # Label L2: Section 2 heading
+        self.L2 = tkinter.Label(self.frame,
+            text='2. Select filtering/detection settings',
+            font=('Helvetica', 16))
+        self.L2.grid(row=4, column=0, **label_kwargs)
+
+        # Button B2: select settings .yaml file
+        self.B2 = tkinter.Button(self.frame, text='Select .yaml file',
+            command=self._b2_callback, **button_kwargs)
+        self.B2.grid(row=5, column=0, **button_grid_kwargs)
+
+        # Label L3: show currently selected settings file
+        self.L3_var = tkinter.StringVar(self.root)
+        self.L3_var.set("None")
+        self.L3 = tkinter.Label(self.frame, 
+            textvariable=self.L3_var)
+        self.L3.grid(row=6, column=0, **label_kwargs)
+
+        # Label L4: Section 3 heading
+        self.L4 = tkinter.Label(self.frame, 
+            text='3. Select localization algorithm',
+            font=('Helvetica', 16))
+        self.L4.grid(row=8, column=0, **label_kwargs)
+
+        # Label L5
+        self.L5_var = tkinter.StringVar(self.root)
+        self.L5_var.set("Unselected")
+        self.L5 = tkinter.Label(self.frame,
+            textvariable=self.L5_var)
+        self.L5.grid(row=9, column=0, **label_kwargs)
+
+        # P1: Progress bar
+
+
+        # HEREIS
+
+        # Start the main tkinter loop
+        self.root.mainloop()
+
+    def _b0_callback(self, *args):
+        self.curr_file = filedialog.askopenfilename(
+            initialdir=self.curr_dir,
+            title='Select file/directory'
+        )
+        self.curr_dir = os.path.dirname(self.curr_file)
+        self.L1_var.set(self.curr_file)
+
+    def _b1_callback(self, *args):
+        self.curr_file = filedialog.askdirectory(
+            initialdir=self.curr_dir,
+            title='Select .yaml settings',
+        )
+        self.curr_dir = os.path.dirname(self.curr_file)
+        self.L1_var.set(self.curr_file)
+
+    def _b2_callback(self, *args):
+        """
+        Callback for pressing button self.B2, which
+        prompts the user to select a .yaml 
+        localization settings file.
+
+        """
+        # Prompt user to select file
+        self.curr_file = filedialog.askopenfilename(
+            initialdir=self.curr_dir,
+            title='Select settings file',
+            filetypes=(("yaml files", "*.yaml"), ("all files", "*.*")),
+        )
+
+        # Record the file
+        self.curr_dir = os.path.dirname(self.curr_file)
+        self.L3_var.set(self.curr_file)
+
+        # Try to read the file
+        try:
+            config = qio.read_config(self.L3_var.get())
+            if 'localization' in config.keys():
+                loc_config = config['localization']
+                if 'algorithm' in loc_config.keys():
+                    L5_var.set(loc_config['algorithm'])
+        except:
+            L5_var.set('Unselected')
+            pass 
+
+
 
 def img_to_rgb(img, expand=1, vmax=255.0, vmin=0.0):
     """
