@@ -5,7 +5,7 @@ import setuptools
 
 setuptools.setup(
 	name="quot",
-	version="1.0",
+	version="2.0",
 	packages=setuptools.find_packages(),
 	install_requires=[
 		"nd2reader==3.0.9",

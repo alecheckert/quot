@@ -22,7 +22,12 @@ python setup.py develop
 quot --help
 ```
 
-A typical usage is 
+To launch the main GUI, do
+```
+quot main
+```
+
+To run the filtering/detection module on a specific file, do
 ```
 quot gui samples/sample_movie.tif
 ```

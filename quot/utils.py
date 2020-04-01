@@ -17,9 +17,29 @@ from scipy import ndimage as ndi
 # Warning control
 import warnings 
 
+# Random 8-bit color indices 
+n_colors = 1028
+colors_8bit = np.random.randint(256, size=(1028, 4),
+    dtype='uint8')
+
 # 
 # BASIC UTILITIES ON NDARRAYS AND FLOATS
 #
+def str_to_bool(S):
+    """
+    Try to read a boolean value from a string.
+
+    """
+    if isinstance(S, bool):
+        return S
+    elif isinstance(S, str):
+        if (S=='True') or (S=='true') or (S=='T') or (S=='t'):
+            return True 
+        elif (S=='False') or (S=='false') or (S=='F') or (S=='f'):
+            return False 
+        else:
+            return S 
+
 def set_neg_to_zero(ndarray):
     """
     Set all negative values in a 
@@ -193,6 +213,27 @@ def get_slice(img, hw, pos):
     return img[pos[0]-hw:pos[0]+hw+1, 
         pos[1]-hw:pos[1]+hw+1]
 
+def get_gaussian_kernel(w, k):
+    """
+    Generate a Gaussian detection kernel of window size
+    *w* and sigma *k*.
+
+    args
+    ----
+        w : int
+        k : float
+
+    returns
+    -------
+        2D ndarray, shape (w, w)
+
+    """
+    var2 = 2 * (k**2)
+    g = np.exp(-((np.indices((w, w))-(w-1)/2)**2\
+        ).sum(axis=0) / var2)
+    g = g / g.sum()
+    return g 
+
 def detections_inside_edge(yx_df, frame_size,
     edge_size):
     """
@@ -291,6 +332,445 @@ def get_slice(img, hw, pos):
     """
     return img[pos[0]-hw:pos[0]+hw+1, 
         pos[1]-hw:pos[1]+hw+1]
+
+def upsample(img, upsampling=2):
+    """
+    Return an upsampled version of an image.
+
+    args
+    ----
+        img : 2D ndarray
+        upsampling : int
+
+    returns
+    -------
+        2D ndarray
+
+    """
+    if len(img.shape) == 2:
+        N, M = img.shape 
+        N_up = N * upsampling 
+        M_up = M * upsampling
+        result = np.zeros((N_up, M_up), dtype=img.dtype)
+        for i in range(upsampling):
+            for j in range(upsampling):
+                result[i::upsampling, j::upsampling] = img 
+    elif len(img.shape) == 3:
+        N, M, n_channels = img.shape 
+        N_up = N * upsampling 
+        M_up = M * upsampling
+        result = np.zeros((N_up, M_up, n_channels), dtype=img.dtype)
+        for i in range(upsampling):
+            for j in range(upsampling):
+                result[i::upsampling, j::upsampling, :] = img 
+    return result 
+
+def upsample_overlay_two_color(
+    img, 
+    white_positions,
+    red_positions, 
+    upsampling=2,
+    crosshair_len=8,
+):
+    """
+    Overlay some positions in white and some in red.
+
+    args
+    ----
+        img : 2D ndarray of dtype uint8, or 3D ndarray in
+            RGBA format (YXC)
+        white_positions : 2D ndarray of shape (n_points, 2)
+        red_positions : 2D ndarray of shape (n_points, 2)
+        upsampling : int
+        crosshair_len : int
+
+    returns
+    -------
+        3D ndarray (YXC), RGBA result
+
+    """
+    # Expand the image 
+    if len(img.shape) == 2:
+        N, M = img.shape 
+        N_up = N * upsampling 
+        M_up = M * upsampling
+        I = np.zeros((N_up, M_up, 4), dtype='uint8')
+        for i in range(upsampling):
+            for j in range(upsampling):
+                I[i::upsampling, j::upsampling, 3] = img 
+
+    elif len(img.shape) == 3:
+        N, M, n_channels = img.shape 
+        N_up = N * upsampling 
+        M_up = M * upsampling
+        I = np.zeros((N_up, M_up, 4), dtype='uint8')
+        for i in range(upsampling):
+            for j in range(upsampling):
+                I[i::upsampling, j::upsampling, :] = img 
+
+    # Round positions to the nearest integer
+    P_whi = (white_positions*upsampling).astype('int64')
+    P_red = (red_positions*upsampling).astype('int64')
+
+    # Do the overlay 
+    for j in range(-crosshair_len, crosshair_len+1):
+
+        # White positions 
+
+        # Extend crosshair in y direction
+        PY = P_whi[:,0] + j 
+        PX = P_whi[:,1]
+        inside = (PY>=0) & (PY<N_up) & (PX>=0) & (PX<M_up)
+        I[PY[inside], PX[inside], 3] = 0
+
+        # Extend crosshair in x direction
+        PY = P_whi[:,0]
+        PX = P_whi[:,1] + j 
+        inside = (PY>=0) & (PY<N_up) & (PX>=0) & (PX<M_up)
+        I[PY[inside], PX[inside], 3] = 0
+
+        # Red positions
+
+        # Extend crosshair in y direction
+        PY = P_red[:,0] + j 
+        PX = P_red[:,1] 
+        inside = (PY>=0) & (PY<N_up) & (PX>=0) & (PX<M_up)
+        I[PY[inside], PX[inside], 3] = 255
+        I[PY[inside], PX[inside], 0] = 255 
+
+        # Extend crosshair in x direction
+        PY = P_red[:,0]
+        PX = P_red[:,1] + j 
+        inside = (PY>=0) & (PY<N_up) & (PX>=0) & (PX<M_up)
+        I[PY[inside], PX[inside], 3] = 255
+        I[PY[inside], PX[inside], 0] = 255
+
+    return I 
+
+def upsample_overlay_trajs(img, vmax=None, vmin=None,
+    pos=None, traj_indices=None, u=3, crosshair_len=9,
+    crosshair_type='+'):
+    """
+    Upsample an image and overlay a set of 
+    localizations as crosshairs (+), coloring
+    them by their trajectory index.
+
+    Return the upsampled image as 8-bit RGBA.
+
+    args
+    ----
+        img : 2D ndarray
+        pos : 2D ndarray of shape (n_locs, 2),
+            the YX positions in this frame (in
+            pixels)
+        traj_indices : 1D ndarray of shape 
+            (n_locs), the trajectory indices
+        u : int, upsampling factor 
+
+    returns
+    -------
+        3D ndarray, 8-bit RGBA overlay
+
+    """
+    # Rescale and convert to 8-bit
+    if vmax is None:
+        vmax = img.max()
+    if vmin is None:
+        vmin = img.min()
+    if vmin == vmax:
+        img = np.zeros(img.shape, dtype='uint8')
+    else:
+        img = 255.0*(img.astype('float64')-vmin)/(vmax-vmin)
+        img[img>255.0] = 255.0
+        img[img<0.0] = 0.0
+        img = img.astype('uint8')
+
+    # Invert the color scheme
+    img = 255 - img 
+
+    # Upsample
+    N, M = img.shape 
+    N_up = N * u 
+    M_up = M * u
+    I = np.zeros((N_up, M_up, 4), dtype='uint8')
+    for i in range(u):
+        for j in range(u):
+            I[i::u,j::u,3] = img
+
+    if not pos is None:
+
+        # Convert positions to upsampled pixels, and 
+        # round to nearest integer
+        P = (pos * u).astype('int64')
+
+        # Get the colors of each spot 
+        colors = colors_8bit[traj_indices%n_colors,:3]
+
+        # Do the overlay 
+        if crosshair_type == '+':
+            for j in range(-crosshair_len, crosshair_len+1):
+
+                # Extend crosshair in y direction
+                PY = P[:,0] + j 
+                PX = P[:,1]
+                inside = (PY>=0) & (PY<N_up) & (PX>=0) & (PX<M_up)
+                I[PY[inside], PX[inside], :3] = colors[inside]
+                I[PY[inside], PX[inside], 3] = 255
+
+                # Extend crosshair in x direction
+                PY = P[:,0]
+                PX = P[:,1] + j 
+                inside = (PY>=0) & (PY<N_up) & (PX>=0) & (PX<M_up)
+                I[PY[inside], PX[inside], :3] = colors[inside]
+                I[PY[inside], PX[inside], 3] = 255
+        elif crosshair_type == 'o':
+            coord_shifts = [(5,0), (4,0), (4,1), (4,2), (4,3), 
+                (3,3), (3,4), (2,4), (1,4), (0,4), (0,5),
+                (-1,4), (-2,4), (-3,4), (-3,3), (-4,3), (-4,2),
+                (-4,1), (-4,0), (-5,0), (-4,-1), (-4,-2),
+                (-4,-3), (-3,-3), (-3,-4), (-2,-4), (-1,-4),
+                (0,-4), (0,-5), (1,-4), (2,-4), (3,-4), 
+                (3,-3), (4,-3), (4,-2), (4,-1)]
+
+            for i, j in coord_shifts:
+                PY = P[:,0] + i 
+                PX = P[:,1] + j 
+                inside = (PY>=0) & (PY<N_up) & (PX>=0) & (PX<M_up)
+                I[PY[inside], PX[inside], :3] = colors[inside]
+                I[PY[inside], PX[inside], 3] = 255
+
+    return I 
+
+def upsample_overlay_trajs_history(img, vmax=None, vmin=None,
+    pos_history=None, traj_indices=None, u=3, crosshair_len=9,
+    crosshair_type='+'):
+    """
+    Upsample an image and overlay a set of 
+    localizations as crosshairs (+), coloring
+    them by their trajectory index.
+
+    This version will plot a full trajectory,
+    not a single localization.
+
+    Return the upsampled image as 8-bit RGBA.
+
+    args
+    ----
+        img : 2D ndarray
+        pos_history : list of 2D ndarray, the 
+            YX positions of each trajectory over
+            some number of frames
+        pos : 2D ndarray of shape (n_locs, 2),
+            the YX positions in this frame (in
+            pixels)
+        traj_indices : 1D ndarray of shape 
+            (n_locs), the trajectory indices
+        u : int, upsampling factor 
+
+    returns
+    -------
+        3D ndarray, 8-bit RGBA overlay
+
+    """
+    # Rescale and convert to 8-bit
+    if vmax is None:
+        vmax = img.max()
+    if vmin is None:
+        vmin = img.min()
+    if vmin == vmax:
+        img = np.zeros(img.shape, dtype='uint8')
+    else:
+        img = 255.0*(img.astype('float64')-vmin)/(vmax-vmin)
+        img[img>255.0] = 255.0
+        img[img<0.0] = 0.0
+        img = img.astype('uint8')
+
+    # Invert the color scheme
+    img = 255 - img 
+
+    # Upsample
+    N, M = img.shape 
+    N_up = N * u 
+    M_up = M * u
+    I = np.zeros((N_up, M_up, 4), dtype='uint8')
+    for i in range(u):
+        for j in range(u):
+            I[i::u,j::u,3] = img
+
+    # Do an overlay
+    if not pos_history is None and len(pos_history) > 0:
+
+        # Get the colors corresponding to each trajectory
+        colors = colors_8bit[traj_indices%n_colors,:3]
+
+        # Draw a crosshairs at the last positions of each 
+        # trajectory
+        P = np.asarray([pos[-1,:] for pos in pos_history])
+
+        # Convert positions to upsampled pixels, and 
+        # round to nearest integer
+        P = (P * u).astype('int64')
+
+        if crosshair_type == '+':
+            for j in range(-crosshair_len, crosshair_len+1):
+
+                # Extend crosshair in y direction
+                PY = P[:,0] + j 
+                PX = P[:,1]
+                inside = (PY>=0) & (PY<N_up) & (PX>=0) & (PX<M_up)
+                I[PY[inside], PX[inside], :3] = colors[inside]
+                I[PY[inside], PX[inside], 3] = 255
+
+                # Extend crosshair in x direction
+                PY = P[:,0]
+                PX = P[:,1] + j 
+                inside = (PY>=0) & (PY<N_up) & (PX>=0) & (PX<M_up)
+                I[PY[inside], PX[inside], :3] = colors[inside]
+                I[PY[inside], PX[inside], 3] = 255
+        elif crosshair_type == 'o':
+            coord_shifts = [(5,0), (4,0), (4,1), (4,2), (4,3), 
+                (3,3), (3,4), (2,4), (1,4), (0,4), (0,5),
+                (-1,4), (-2,4), (-3,4), (-3,3), (-4,3), (-4,2),
+                (-4,1), (-4,0), (-5,0), (-4,-1), (-4,-2),
+                (-4,-3), (-3,-3), (-3,-4), (-2,-4), (-1,-4),
+                (0,-4), (0,-5), (1,-4), (2,-4), (3,-4), 
+                (3,-3), (4,-3), (4,-2), (4,-1)]
+
+            for i, j in coord_shifts:
+                PY = P[:,0] + i 
+                PX = P[:,1] + j 
+                inside = (PY>=0) & (PY<N_up) & (PX>=0) & (PX<M_up)
+                I[PY[inside], PX[inside], :3] = colors[inside]
+                I[PY[inside], PX[inside], 3] = 255
+
+        # For each trajectory, draw lines indicating
+        # its past movement
+        for traj_idx, pos in enumerate(pos_history):
+
+            if pos.shape[0] > 1:
+
+                # Convert positions to upsampled pixels, and 
+                # round to nearest integer
+                P = (pos * u).astype('int64')
+
+                # Get this spot's color
+                color = colors[traj_idx]
+
+                # Get a line with Bresenham's algorithm
+                for j in range(1, pos.shape[0]):
+                    line = np.asarray(bresenham(P[j,:], P[j-1,:]))
+                    I[line[:,0], line[:,1], :3] = color 
+                    I[line[:,0], line[:,1], 3] = 255 
+
+    return I 
+
+def bresenham(p0, p1):
+    """
+    Bresenham's algorithm for drawing a line in 
+    terms of discrete pixels.
+
+    args
+    ----
+        p0 : (int, int), (x, y) for first point
+        p1 : (int, int), (x, y) for second point
+
+    returns
+    -------
+        2D ndarray of shape (n_points, 2), the 
+            YX coords of each point
+
+    """
+    x0, y0 = p0
+    x1, y1 = p1 
+    dx = abs(x1-x0)
+    dy = abs(y1-y0)
+    if x0 < x1:
+        sx = 1
+    else:
+        sx = -1 
+    if y0 < y1:
+        sy = 1 
+    else:
+        sy = -1 
+    err = dx - dy 
+
+    cx = x0
+    cy = y0
+
+    result = [(cx, cy)]
+
+    while (x0 != x1) and (y0 != y1):
+        e2 = 2 * err 
+        if e2 > -dy:
+            err = err - dy 
+            x0 = x0 + sx 
+        if e2 < dx:
+            err = err + dx 
+            y0 = y0 + sy 
+
+        result.append((x0, y0))
+
+    return result 
+
+def overlay_spots_rgba(img, positions, 
+    channel=0, crosshair_len=4):
+    """
+    Make a copy of an RGBA image and write crosshairs
+    over it at a set of defined positions in a 
+    particular color.
+
+    args
+    ----
+        image : 3D ndarray, RGBA image
+        positions : 2D ndarray of shape
+            n_points, 2), the positions
+            of the points
+        channel : int, RGB color index 
+        crosshair_len : int, size of the 
+            crosshairs
+
+    returns
+    -------
+        3D ndarray, copy of the image with
+            the overlayed crosshairs
+
+    """
+    I = img.copy()
+
+    # If no positions are passed, return the same image 
+    if (positions.shape[0] == 0) or \
+        (len(positions.shape) < 2):
+        return I 
+
+    # Round positions to the nearest integer
+    P = positions.astype('int64')
+
+    I_max = I.max()
+    N, M, n_color = I.shape
+
+    for j in range(-crosshair_len, crosshair_len+1):
+
+        # Extend crosshair in y direction
+        PY = P[:,0] + j 
+        PX = P[:,1]
+        inside = (PY>=0) & (PY<N) & (PX>=0) & (PX<M)
+        I[PY[inside], PX[inside], 3] = 255 
+        if channel == 3:
+            pass
+        else:
+            I[PY[inside], PX[inside], channel] = 255 
+
+        # Extend crosshair in x direction
+        PY = P[:,0]
+        PX = P[:,1] + j 
+        inside = (PY>=0) & (PY<N) & (PX>=0) & (PX<M)
+        I[PY[inside], PX[inside], 3] = 255
+        if channel == 3:
+            pass 
+        else:
+            I[PY[inside], PX[inside], channel] = 255
+
+    return I 
 
 def overlay_spots(image, positions,
     crosshair_len=4):
@@ -447,9 +927,39 @@ def rescale_img(img, camera_offset=0.0, camera_gain=1.0):
 
     """
     if (camera_offset!=0.0) and (camera_gain!=1.0):
-        return (img-camera_bg)/camera_gain
+        return (img-camera_offset)/camera_gain
     else:
         return img 
+
+def fit_is_sane(fit_pars, w, max_I=10000, border=2):
+    """
+    Check whether a set of fit parameters make physical
+    sense - i.e. they're inside the fitting window.
+
+    args
+    ----
+        fit_pars : dict with 'y0', 'x0', 'I', and
+            'bg', or 1D ndarray of size 4 with the
+            same parameters
+        max_I : float, max permissible intensity
+
+    returns
+    -------
+        bool
+
+    """
+    b0 = border 
+    b1 = w - border 
+    if isinstance(fit_pars, dict):
+        return (fit_pars['y0']>=b0) and (fit_pars['y0']<=b1) and \
+            (fit_pars['x0']>=b0) and (fit_pars['x0']<=b1) and \
+            (fit_pars['I']>=0) and (fit_pars['I']<=max_I) and \
+            (fit_pars['bg']>=0)
+    else:
+        return (fit_pars[0]>=b0) and (fit_pars[0]<=b1) and \
+            (fit_pars[1]>=b0) and (fit_pars[1]<=b1) and \
+            (fit_pars[2]>=0) and (fit_pars[2]<=max_I) and \
+            (fit_pars[3]>=0)
 
 def psf_int_1d(X, x0, sigma=1.0):
     """
@@ -594,7 +1104,7 @@ def eval_psf_point(Y, X, sigma=1.0, **kwargs):
         (2*np.pi*(sigma**2)) + kwargs['bg']
 
 def estimate_intensity(psf_img, y0, x0, bg,
-    sigma=1.0):
+    sigma=1.0, max_I=10000):
     """
     Given an image and a proposed center for
     a PSF, estimate the intensity of the pixel
@@ -612,6 +1122,11 @@ def estimate_intensity(psf_img, y0, x0, bg,
         y0, x0 : floats, proposed center of PSF
         bg : float, proposed BG of PSF 
         sigma : float, Gaussian PSF width 
+        max_I : float, the maximum permissible
+            value for the intensity. The intensity
+            tends to diverge sometimes. If the
+            estimated value for I exceeds this 
+            value, fall back to a different method.
 
     returns
     -------
@@ -625,12 +1140,20 @@ def estimate_intensity(psf_img, y0, x0, bg,
         psf_img.shape)
 
     # Evaluate intensity estimate 
-    return stable_divide_float(
+    estimate = stable_divide_float(
         psf_img[ym,xm] - bg,
         psf_int_1d(ym, y0, sigma=sigma) * \
             psf_int_1d(xm, x0, sigma=sigma),
         inf=np.nan, 
     )
+
+    # Check whether it's crazy, and if so,
+    # guess by a different method
+    if (estimate < 0) or (estimate > max_I):
+        estimate = (psf_img-bg).sum()
+
+    return estimate 
+
 
 def estimate_snr(psf_img, amp):
     """
@@ -1035,4 +1558,204 @@ def wireframe_overlay(*imgs):
         ax.set_zlim((0, ax.get_zlim()[1]))
     plt.show(); plt.close()
 
+
+# 
+# LOCALIZATION DATAFRAME UTILITIES
+#
+def attrib_histogram_2d(locs, attrib_0, attrib_1, n_bins=150):
+    """
+    Make a 2D histogram of the density of each 
+    attribute, for potential masking.
+
+    args
+    ----
+        locs : pandas.DataFrame
+        attrib_0, attrib_1: str, columns in locs 
+
+    returns
+    -------
+        (
+            2D ndarray, the density,
+            1D ndarray, the bin edges for attrib_0
+            1D ndarray, the bin edges for attrib_1
+        )
+
+    """
+    # Make sure the dataframe contains the desired columns
+    assert attrib_0 in locs.columns
+    assert attrib_1 in locs.columns
+
+    # Format as ndarray for speed
+    X = np.asarray(locs[[attrib_0, attrib_1]])
+
+    # Exclude outliers
+    y0 = max([
+        X[:,0].mean() - 3*X[:,0].std(),
+        X[:,0].min()
+    ])
+    y1 = min([
+        X[:,0].mean() + 3*X[:,0].std(),
+        X[:,0].max()
+    ])
+    x0 = max([
+        X[:,1].mean() - 3*X[:,1].std(),
+        X[:,1].min()
+    ])
+    x1 = min([
+        X[:,1].mean() + 3*X[:,1].std(),
+        X[:,1].max()
+    ])
+
+    # Make the bins in each axis
+    bin_edges_0 = np.linspace(y0, y1, n_bins+1)
+    bin_edges_1 = np.linspace(x0, x1, n_bins+1)
+
+    # Make the 2D histogram
+    H, _edges_0, _edges_1 = np.histogram2d(
+        X[:,0], X[:,1], bins=(bin_edges_0, bin_edges_1))
+
+    return H, bin_edges_0, bin_edges_1 
+
+#
+# TRACKING UTILITIES
+#
+def connected_components(semigraph):
+    '''
+    Find independent subgraphs in a semigraph by a floodfill procedure.
+    
+    args
+        semigraph : 2D binary np.array (only 0/1 values), representing
+            a semigraph
+    
+    returns
+        subgraphs : list of 2D np.array, the independent adjacency subgraphs;
+        
+        subgraph_y_indices : list of 1D np.array, the y-indices of each 
+            independent adjacency subgraph;
+            
+        subgraph_x_indices : list of 1D np.array, the x-indices of each 
+            independent adjacency subgraph;
+        
+        y_without_x : 1D np.array, the y-indices of y-nodes without any edges
+            to x-nodes;
+        
+        x_without_y : 1D np.array, the x-indices of x-nodes without any edges
+            to y-nodes.
+            
+    '''
+    if semigraph.max() > 1:
+        raise RuntimeError("connected_components only takes binary arrays")
+        
+    # The set of all y-nodes (corresponding to y-indices in the semigraph)
+    y_indices = np.arange(semigraph.shape[0]).astype('uint16')
+    
+    # The set of all x-nodes (corresponding to x-indices in the semigraph)
+    x_indices = np.arange(semigraph.shape[1]).astype('uint16')
+
+    # Find y-nodes that don't connect to any x-node,
+    # and vice versa
+    where_y_without_x = (semigraph.sum(axis = 1) == 0)
+    where_x_without_y = (semigraph.sum(axis = 0) == 0)
+    y_without_x = y_indices[where_y_without_x]
+    x_without_y = x_indices[where_x_without_y]
+    
+    # Consider the remaining nodes, which have at least one edge
+    # to a node of the other class 
+    semigraph = semigraph[~where_y_without_x, :]
+    semigraph = semigraph[:, ~where_x_without_y]
+    y_indices = y_indices[~where_y_without_x]
+    x_indices = x_indices[~where_x_without_y]
+    
+    # For the remaining nodes, keep track of (1) the subgraphs
+    # encoding connected components, (2) the set of original y-indices
+    # corresponding to each subgraph, and (3) the set of original x-
+    # indices corresponding to each subgraph
+    subgraphs = []
+    subgraph_y_indices = []
+    subgraph_x_indices = []
+
+    # Work by iteratively removing independent subgraphs from the 
+    # graph. The list of nodes still remaining are kept in 
+    # *unassigned_y* and *unassigned_x*
+    unassigned_y, unassigned_x = (semigraph == 1).nonzero()
+    
+    # The current index is used to floodfill the graph with that
+    # integer. It is incremented as we find more independent subgraphs. 
+    current_idx = 2
+    
+    # While we still have unassigned nodes
+    while len(unassigned_y) > 0:
+        
+        # Start the floodfill somewhere with an unassigned y-node
+        semigraph[unassigned_y[0], unassigned_x[0]] = current_idx
+    
+        # Keep going until subsequent steps of the floodfill don't
+        # pick up additional nodes
+        prev_nodes = 0
+        curr_nodes = 1
+        while curr_nodes != prev_nodes:
+            # Only floodfill along existing edges in the graph
+            where_y, where_x = (semigraph == current_idx).nonzero()
+            
+            # Assign connected nodes to the same subgraph index
+            semigraph[where_y, :] *= current_idx
+            semigraph[semigraph > current_idx] = current_idx
+            semigraph[:, where_x] *= current_idx
+            semigraph[semigraph > current_idx] = current_idx
+            
+            # Correct for re-finding the same nodes and multiplying
+            # them more than once (implemented in the line above)
+            # semigraph[semigraph > current_idx] = current_idx
+            
+            # Update the node counts in this subgraph
+            prev_nodes = curr_nodes
+            curr_nodes = (semigraph == current_idx).sum()
+        current_idx += 1 
+
+        # Get the local indices of the y-nodes and x-nodes (in the context
+        # of the remaining graph)
+        where_y = np.unique(where_y)
+        where_x = np.unique(where_x)
+
+        # Use the local indices to pull this subgraph out of the 
+        # main graph 
+        subgraph = semigraph[where_y, :]
+        subgraph = subgraph[:, where_x]
+
+        # Save the subgraph
+        if not (subgraph.shape[0] == 0 and subgraph.shape[0] == 0):
+            subgraphs.append(subgraph)
+        
+            # Get the original y-nodes and x-nodes that were used in this
+            # subgraph
+            subgraph_y_indices.append(y_indices[where_y])
+            subgraph_x_indices.append(x_indices[where_x])
+
+        # Update the list of unassigned y- and x-nodes
+        unassigned_y, unassigned_x = (semigraph == 1).nonzero()
+
+    return subgraphs, subgraph_y_indices, subgraph_x_indices, y_without_x, x_without_y
+
+def sq_radial_distance(vector, points):
+    return ((vector - points) ** 2).sum(axis = 1)
+
+def sq_radial_distance_array(points_0, points_1):
+    '''
+    args
+        points_0    :   np.array of shape (N, 2), coordinates
+        points_1    :   np.array of shape (M, 2), coordinates
+
+    returns
+        np.array of shape (N, M), the radial distances between
+            each pair of points in the inputs
+
+    '''
+    array_points_0 = np.zeros((points_0.shape[0], points_1.shape[0], 2), dtype = 'float')
+    array_points_1 = np.zeros((points_0.shape[0], points_1.shape[0], 2), dtype = 'float')
+    for idx_0 in range(points_0.shape[0]):
+        array_points_0[idx_0, :, :] = points_1 
+    for idx_1 in range(points_1.shape[0]):
+        array_points_1[:, idx_1, :] = points_0
+    result = ((array_points_0 - array_points_1)**2).sum(axis = 2)
+    return result 
 

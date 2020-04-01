@@ -5,6 +5,9 @@ localize.py
 # Numerics
 import numpy as np 
 
+# File paths
+import os 
+
 # Image processing
 from scipy import ndimage as ndi 
 
@@ -242,6 +245,14 @@ def mle_poisson(psf_img, sigma=1.0, max_iter=20,
         pars = [guess['y0'], guess['x0'], \
             guess['I'], guess['bg']]
 
+    # Check whether the fit makes sense - is 
+    # within window, doesn't have crazy intensity 
+    # values, etc.
+    if not utils.fit_is_sane(pars, psf_img.shape[0]):
+        pars = np.array([guess['y0'], guess['x0'],
+            guess['I'], guess['bg']])
+        converged = False 
+
     # Estimate peak amplitude of Gaussian
     amp = utils.amp_from_I(pars[2], sigma=sigma)
 
@@ -334,6 +345,14 @@ def ls_int_gaussian(psf_img, sigma=1.0, max_iter=20,
         converged = False
     else:
         converged = True 
+
+    # Check whether the fit makes sense - is 
+    # within window, doesn't have crazy intensity 
+    # values, etc.
+    if not utils.fit_is_sane(pars, psf_img.shape[0]):
+        pars = np.array([guess['y0'], guess['x0'],
+            guess['I'], guess['bg']])
+        converged = False 
 
     # Estimate peak amplitude of Gaussian
     amp = utils.amp_from_I(pars[2], sigma=sigma)
@@ -444,6 +463,14 @@ def ls_point_gaussian(psf_img, sigma=1.0, max_iter=20,
     else:
         converged = True 
 
+    # Check whether the fit makes sense - is 
+    # within window, doesn't have crazy intensity 
+    # values, etc.
+    if not utils.fit_is_sane(pars, psf_img.shape[0]):
+        pars = np.array([guess['y0'], guess['x0'],
+            guess['I'], guess['bg']])
+        converged = False 
+
     # Estimate peak amplitude of Gaussian
     amp = utils.amp_from_I(pars[2], sigma=sigma)
 
@@ -549,6 +576,7 @@ LOCALIZE_METHODS = {
     'radial_symmetry': radial_symmetry,
     'mle_poisson': mle_poisson,
     'ls_int_gaussian': ls_int_gaussian,
+    'ls_point_gaussian': ls_point_gaussian,
     'ls_log_gaussian': ls_log_gaussian,
 }
 
@@ -671,40 +699,127 @@ def localize_file(path, config_path, t0=None, t1=None,
         t0 = 0
 
     # Read config settings
-    config = qio.read_config(config_path)
+    configs = qio.read_config(config_path)
+    configs['t0'] = t0 
+    configs['t1'] = t1 
 
-    # Create an image file reader
+    # Run localization
+    return _loc_file(path, verbose=verbose, **configs)
+
+def _loc_files(paths, verbose=True, **configs):
+    """
+    Run localization on a set of target files.
+
+    args
+    ----
+        paths : list of str
+        configs : dict, in the standard configuration
+            format with 'filtering', 'detection',
+            and 'localization' keys
+
+    returns
+    -------
+        None
+
+    """
+    for path_idx, path in enumerate(paths):
+
+        # Run localization
+        locs = _loc_file(path, verbose=verbose, **configs)
+
+        # Save 
+        locs.to_csv("%s_locs.csv" % os.path.splitext(path)[0],
+            index=False)
+
+        # Show progress 
+        if verbose:
+            print('Finished with %s...' % path)
+
+def _loc_file(path, verbose=False, **configs):
+    """
+    Run localization on a given file, with a
+    set of keyword arguments in the settings
+    format written by gui.GUI.
+
+    args
+    ----
+        path :  str 
+        verbose :  bool, show progress
+        configs :  dict
+
+    returns
+    -------
+        pandas.DataFrame, localizations
+
+    """
+    # If the user has not specified the localization
+    # settings, only do detection
+    if 'localization' not in configs.keys():
+        if verbose:
+            print("No localization settings specified for " \
+                "%s; only running detection" % path)
+        locs = _detect_file(path, verbose=verbose, **configs)
+        return locs 
+
+    # If the user sets a start frame, only filter
+    # from that point onward
+    if 'start_frame' in configs.keys():
+        t0 = int(configs['start_frame'])
+    else:
+        t0 = 0 
+
+    # If the user sets a stop frame, only filter
+    # up to that frame
+    if 'stop_frame' in configs.keys():
+        t1 = int(configs['stop_frame'])
+    else:
+        t1 = None 
+
+    # Figure out if the user has specified whether
+    # to localize in the filtered image 
+    if 'localize_in_filtered' in configs.keys():
+        localize_in_filtered = utils.str_to_bool(
+            configs['localized_in_filtered'])
+    else:
+        localize_in_filtered = False 
+
+    # Create image file reader 
     reader = qio.ImageFileReader(path)
 
     # Create an image filterer
     filterer = image_filter.SubregionFilterer(
         reader, None, start_iter=t0, stop_iter=t1,
-        **config['filtering'])
+        **configs['filtering'])
 
     # Set up filtering, detection, and localization
-    if 'localize_in_filtered' in config['localization'].keys() \
-        and config['localization']['localize_in_filtered']:
+    if localize_in_filtered:
         locs = (
             localize_frame(
                 img,
-                detect.detect(img, **config['detection']),
-                **config['localization'],
+                detect.detect(img, **configs['detection']),
+                **configs['localization'],
             ) for img in filterer 
         )
     else:
         locs = (
             localize_frame(
                 reader.get_frame(i+t0),
-                detect.detect(img, **config['detection']),
-                **config['localization'],
+                detect.detect(img, **configs['detection']),
+                **configs['localization'],
             ) for i, img in enumerate(filterer)
         )
 
     # Run filtering, detection, and localization
-    locs = pd.concat(
-        [l.assign(frame_idx=i) for i, l in enumerate(locs)],
-        ignore_index=True, sort=False
-    )
+    if verbose:
+        locs = pd.concat(
+            [l.assign(frame_idx=i) for i, l in tqdm(enumerate(locs))],
+            ignore_index=True, sort=False
+        )
+    else:
+        locs = pd.concat(
+            [l.assign(frame_idx=i) for i, l in enumerate(locs)],
+            ignore_index=True, sort=False
+        )
 
     # Adjust frame indices to account for start
     # frame
@@ -712,58 +827,92 @@ def localize_file(path, config_path, t0=None, t1=None,
 
     return locs 
 
-def detect_file(path, config_path, t0=None, t1=None,
-    verbose=False):
+def _detect_file(path, verbose=False, **configs):
     """
-    Detect all spots in an image file according to
-    a set of configuration settings.
+    Only run detection on a file, without subpixel
+    localization.
 
     args
     ----
-        path : str, path to ND2 or TIF file
-        config_path : str, path to YAML config
-            file
-        t0 : int, start frame
-        t1 : int, stop frame
-        verbose : bool, progress bar
+        path : str, file path 
+        verbose : bool, show progress
+        configs : from a settings.yaml file
 
     returns
     -------
-        pandas.DataFrame
+        pandas.DataFrame, columns [`yd`, `xd`,
+            `frame_idx`]
 
     """
-    if t0 is None:
-        t0 = 0
+    # If the user sets a start frame, only filter
+    # from that point onward
+    if 'start_frame' in configs.keys():
+        t0 = int(configs['start_frame'])
+    else:
+        t0 = 0 
 
-    # Read the config settings
-    config = qio.read_config(config_path)
+    # If the user sets a stop frame, only filter
+    # up to that frame
+    if 'stop_frame' in configs.keys():
+        t1 = int(configs['stop_frame'])
+    else:
+        t1 = None 
 
-    # Create an image file reader
+    # Create image file reader 
     reader = qio.ImageFileReader(path)
 
     # Create an image filterer
     filterer = image_filter.SubregionFilterer(
         reader, None, start_iter=t0, stop_iter=t1,
-        **config['filtering'])
+        **configs['filtering'])
 
-    # Set up filtering + detection
-    detections = (detect.detect(img, **config['detection']) \
+    # Set up filtering and detection 
+    detections = (detect.detect(img, **configs['detection']) \
         for img in filterer)
 
-    # Show a progress bar, if desired
+    # Run filtering and detection 
     if verbose:
-        data = tqdm(enumerate(detections))
+        locs = pd.concat(
+            [d.assign(frame_idx=i) for i, d in tqdm(enumerate(detections))],
+            ignore_index=True, sort=False
+        )
     else:
-        data = enumerate(detections)
+        locs = pd.concat(
+            [d.assign(frame_idx=i) for i, d in enumerate(detections)],
+            ignore_index=True, sort=False
+        )
 
-    # Run detection
-    detections = pd.concat(
-        [d.assign(frame_idx=i) for i, d in data],
-        ignore_index=True, sort=False,
-    )
+    # Adjust frame indices to account for start
+    # frame
+    locs['frame_idx'] += t0 
 
-    # Adjust frame index
-    detections['frame_idx'] += t0 
+    return locs 
 
-    return detections 
+def _detect_files(paths, verbose=True, **configs):
+    """
+    Run detection on a set of target files.
+
+    args
+    ----
+        paths : list of str
+        configs : dict, in the standard configuration
+            format with 'filtering' and 'detection' keys 
+
+    returns
+    -------
+        None
+
+    """
+    for path_idx, path in enumerate(paths):
+
+        # Run localization
+        locs = _detect_file(path, verbose=verbose, **configs)
+
+        # Save 
+        locs.to_csv("%s_locs.csv" % os.path.splitext(path)[0],
+            index=False)
+
+        # Show progress 
+        if verbose:
+            print('Finished with %s...' % path)
 

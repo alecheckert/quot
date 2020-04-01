@@ -7,7 +7,7 @@ __main__.py
 import click 
 
 # GUI interface
-from quot.gui import GUI 
+from quot.gui import GUI, MainGUI
 
 # File path stuff
 import os 
@@ -121,6 +121,15 @@ def loc(
         # Save 
         locs.to_csv(out_f, index=False)
         if verbose: print('Finished %s...' % f)
+
+@cli.command()
+def main():
+    """
+    Launch the main GUI, with options for each 
+    of the other steps.
+
+    """
+    main_gui = MainGUI()
 
 if __name__ == '__main__':
     cli()

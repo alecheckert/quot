@@ -47,6 +47,21 @@ def read_config(path):
     with open(path, 'r') as f:
         return yaml.safe_load(f)
 
+def path_exists(path):
+    """
+    Return True if the file or directory exists.
+
+    args
+    ----
+        path : str 
+
+    returns
+    -------
+        bool
+
+    """
+    return os.path.isdir(path) or os.path.isfile(path)
+
 class ImageFileReader(object):
     def __init__(self, file_name, start_iter=0,
         stop_iter=None):
