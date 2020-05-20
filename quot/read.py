@@ -15,7 +15,6 @@ import toml
 # Underlying file readers for each file format
 import tifffile
 from nd2reader import ND2Reader 
-from czifile import CziFile 
 
 def read_config(path):
     """
@@ -79,9 +78,9 @@ class ImageReader(object):
         elif ('.tif' in path) or ('.tiff' in path):
             self.ext = '.tif'
             self._reader = tifffile.TiffFile(path)
-        elif ('.czi' in path):
-            self.ext = '.czi'
-            self._reader = CziFile(path)
+        #elif ('.czi' in path):
+        #    self.ext = '.czi'
+        #    self._reader = CziFile(path)
         else:
             raise RuntimeError("Image format %s not recognized" % \
                 os.path.splitext(path)[1])

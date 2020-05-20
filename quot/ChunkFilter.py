@@ -79,11 +79,7 @@ class ChunkFilter(ImageReader):
         self.load_chunk(self.chunk_start)
 
         # Set the method keyword arguments
-        self._set_method_kwargs(method=self.method, **method_kwargs)
-
-        # Precompute some factors necessary for filtering on the current
-        # block
-        #self._generate_cache()
+        self.set_method_kwargs(method=self.method, **method_kwargs)
 
     def __next__(self):
         if self._c < self.stop:
@@ -124,40 +120,65 @@ class ChunkFilter(ImageReader):
         in a GUI setting.
 
         """
+        print("Generating ChunkFilter cache...")
         if not self.method_static:
-            return {
+            self.cache = {
                 'mean_img': self.chunk.mean(axis=0),
                 'median_img': np.median(self.chunk, axis=0),
                 'min_img': self.chunk.min(axis=0),
             }
+            for i in ['mean_img', 'median_img', 'min_img']:
+                self.cache['gauss_filt_%s' % i] = gaussian_filter(self.cache[i], self.method_kwargs.get('k', 5.0))
         else:
-            cache = {}
+            self.cache = {}
             if FILTER_CACHES[self.method] == 'mean_img':
-                cache['mean_img'] = self.chunk.mean(axis=0)
+                self.cache['mean_img'] = self.chunk.mean(axis=0)
             elif FILTER_CACHES[self.method] == 'median_img':
-                cache['median_img'] = np.median(self.chunk, axis=0)
+                self.cache['median_img'] = np.median(self.chunk, axis=0)
             elif FILTER_CACHES[self.method] == 'min_img':
-                cache['min_img'] = self.chunk.min(axis=0)
+                self.cache['min_img'] = self.chunk.min(axis=0)
             elif FILTER_CACHES[self.method] == 'gauss_filt_mean_img':
-                cache['gauss_filt_mean_img'] = gaussian_filter(
+                self.cache['gauss_filt_mean_img'] = gaussian_filter(
                     self.chunk.mean(axis=0),
                     self.method_kwargs.get('k', 5.0)
                 )
             elif FILTER_CACHES[self.method] == 'gauss_filt_min_img':
-                cache['gauss_filt_min_img'] = gaussian_filter(
+                self.cache['gauss_filt_min_img'] = gaussian_filter(
                     self.chunk.min(axis=0),
                     self.method_kwargs.get('k', 5.0)
                 )               
             elif FILTER_CACHES[self.method] == 'gauss_filt_median_img':
-                cache['gauss_filt_median_img'] = gaussian_filter(
+                self.cache['gauss_filt_median_img'] = gaussian_filter(
                     np.median(self.chunk, axis=0),
                     self.method_kwargs.get('k', 5.0)
                 )
             else:
                 pass 
-            return cache 
 
-    def _set_method_kwargs(self, method=None, **kwargs):
+    def _recache_filtered_image(self):
+        """
+        A somewhat specialized method. Recache only one of the Gaussian-
+        filtered images, like "gauss_filt_min_img", "gauss_filt_median_img",
+        etc. This is useful when setting method kwargs that will change
+        the kernel size for filtering.
+
+        This is only permissible when self.method_static is False, since
+        it requires using one of the basic images ("min_img" or "median_img",
+        in the two examples above).
+
+        """
+        if self.method_static or (not (self.method in ['sub_gauss_filt_min',
+            'sub_gauss_filt_median', 'sub_gauss_filt_mean'])):
+            print("ChunkFilter._recache_filtered_image: has no effect " \
+                "when method is static or does not involve Gaussian filtering")
+        else:
+            image_name = FILTER_CACHES[self.method]
+            self.cache[image_name] = gaussian_filter(self.cache[ORIGIN_IMAGES[image_name]],
+                self.method_kwargs.get('k', 5.0))
+            self.method_kwargs[image_name] = self.cache[image_name]
+
+    def set_method_kwargs(self, method=None, recache_filtered_image=False,
+        **kwargs):
         """
         Set the kwargs passed to the underlying filtering 
         method. This includes factors that are precomputed
@@ -170,6 +191,8 @@ class ChunkFilter(ImageReader):
         args
         ----
             method  :   str, the name of the method to use
+            recache :   bool, force the ChunkFilter to recache
+                        the Gaussian filtered image, if it exists
             kwargs  :   to the method
 
         """
@@ -180,13 +203,17 @@ class ChunkFilter(ImageReader):
             self.method = method 
             if self.method_static:
                 self._generate_cache()
+
+        # Force re-cache, if desired
+        if recache_filtered_image:
+            self._recache_filtered_image()
         
         # Set cached factors required as keyword arguments
         if not (FILTER_CACHES[self.method] is None):
             self.method_kwargs[FILTER_CACHES[self.method]] = \
                 self.cache[FILTER_CACHES[self.method]]
 
-    def _set_chunk_size(self, chunk_size):
+    def set_chunk_size(self, chunk_size):
         """
         Change the chunk size for this ChunkFilter.
 
@@ -248,7 +275,7 @@ class ChunkFilter(ImageReader):
 
         # Precompute some values for the current filtering method
         if recache:
-            self.cache = self._generate_cache()
+            self._generate_cache()
             cache_key = FILTER_CACHES[self.method]
             if not cache_key is None:
                 self.method_kwargs[cache_key] = self.cache[cache_key]
@@ -431,6 +458,13 @@ FILTER_CACHES = {
     'sub_gauss_filt_min': 'gauss_filt_min_img',
     'sub_gauss_filt_median': 'gauss_filt_median_img',
     'sub_gauss_filt_mean': 'gauss_filt_mean_img',
+}
+
+# The base images for derived images
+ORIGIN_IMAGES = {
+    'gauss_filt_min_img': 'min_img',
+    'gauss_filt_median_img': 'median_img',
+    'gauss_filt_mean_img': 'mean_img',
 }
 
 # All available filtering methods

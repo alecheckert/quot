@@ -254,9 +254,9 @@ def _dog_setup(H, W, k0, k1, w):
     """
     S0 = 2*(k0**2)
     S1 = 2*(k1**2)
-    g1 = np.exp(-((np.indices((w,w))-(w-1)/2)**2).sum(0)/S1)
+    g1 = np.exp(-((np.indices((int(w),int(w)))-(int(w)-1)/2)**2).sum(0)/S0)
     g1 = g1 / g1.sum()
-    g2 = np.exp(-((np.indices((w,w))-(w-1)/2)**2).sum(0)/S2)
+    g2 = np.exp(-((np.indices((int(w),int(w)))-(int(w)-1)/2)**2).sum(0)/S1)
     g2 = g2 / g2.sum()   
     return rfft2(pad(g1-g2, H, W))
 
@@ -290,7 +290,7 @@ def log(I, k=1.0, w=11, t=200.0, return_filt=False):
     G_rft = _log_setup(*I.shape, k, w)
 
     # Perform the convolution
-    return threshold_image(fftshift(irfft2(rfft2(I)*dog_tf)), 
+    return threshold_image(fftshift(irfft2(rfft2(I)*G_rft)), 
         t=t, return_filt=return_filt)
 
 def _log_setup(H, W, k, w):
@@ -378,8 +378,7 @@ def min_max(I, w=9, t=200.0, mode='constant', return_filt=False,
     size = (w, w)
     I_filt = ndi.maximum_filter(I, size=size, mode=mode, **kwargs) - \
         ndi.minimum_filter(I, size=size, mode=mode, **kwargs)
-    return threshold_image(ndi.uniform_filter(I, w0) - \
-        ndi.uniform_filter(I, w1), t=t, return_filt=return_filt)
+    return threshold_image(I_filt, t=t, return_filt=return_filt)
 
 def gauss_filt_min_max(I, k=1.0, w=9, t=200.0, mode='constant',
     return_filt=False, **kwargs):
@@ -416,7 +415,7 @@ def gauss_filt_min_max(I, k=1.0, w=9, t=200.0, mode='constant',
 
     # Perform the convolution and do min/max filtering on
     # the result
-    return min_max_filter(fftshift(irfft2(rfft2(I)*G_rft)),
+    return min_max(fftshift(irfft2(rfft2(I)*G_rft)),
         w=w, t=t, mode=mode, return_filt=return_filt, **kwargs)
 
 def llr(I, k=1.0, w=9, t=20.0, return_filt=False):
@@ -453,12 +452,12 @@ def llr(I, k=1.0, w=9, t=20.0, return_filt=False):
     n_pixels = w**2
 
     # Perform the convolutions for detection
-    A = ndi.uniform_filter(I, w) * n_pixels
-    B = ndi.uniform_filter(I**2, w) * n_pixels 
+    A = ndi.uniform_filter(I, w)
+    B = ndi.uniform_filter(I**2, w)
     C = fftshift(irfft2(rfft2(I)*G_rft))**2
 
     # Evaluate the log likelihood ratio for presence of a Gaussian spot
-    L = 1.0 - stable_divide_array(C, Sgc2*n_pixels*(B-A), zero=0.001)
+    L = 1.0 - stable_divide_array(C, n_pixels*Sgc2*(B-A**2), zero=0.001)
 
     # Set probability of detection close to edges to zero
     hw = w//2
@@ -500,6 +499,8 @@ def llr_rect(I, w0=3, w1=11, t=20.0, return_filt=False):
                 coordinates of each spot
 
     """
+    n_pixels = w1**2 
+
     # Compute normalization factor
     Suc2 = n_pixels * ((1.0/(w0**2)) - (1.0/(w1**2)))
 
