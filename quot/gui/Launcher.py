@@ -16,6 +16,7 @@ from PySide2.QtWidgets import QApplication, QWidget, QLabel, \
 
 # Custom GUI utilities
 from .guiUtils import set_dark_app, getOpenFilePath
+from .ImageViewer import ImageViewer 
 from .DetectViewer import DetectViewer 
 
 class Launcher(QWidget):
@@ -74,7 +75,19 @@ class Launcher(QWidget):
         self.show()
 
     def launch_image_viewer(self):
-        pass 
+        """
+        Launch an instance of ImageViewer on a sample file, 
+        which is a simple viewer for movies.
+
+        """
+        # Prompt the user to enter a target image file
+        path = getOpenFilePath(self, "Select image file",
+            "Image files (*.nd2 *.tif *.tiff)",
+            initialdir=self.currdir)
+
+        # If this is a real file, launch an ImageViewer on it
+        if os.path.isfile(path):
+            I = ImageViewer(path, parent=self)
 
     def launch_detect_viewer(self):
         """

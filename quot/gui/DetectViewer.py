@@ -36,7 +36,8 @@ from pyqtgraph.graphicsItems import ScatterPlotItem as SPI_base
 # Custom GUI utilities
 from .guiUtils import FloatSlider, IntSlider, LabeledQComboBox, \
     set_dark_app, LabeledImageView, getTextInputs, keys_to_str, \
-    Symbols, ROISelectionBox, MASTER_COLOR, PromptSelectROI 
+    Symbols, ROISelectionBox, MASTER_COLOR, PromptSelectROI, \
+    ImageSubpositionWindow
 
 # Configuration settings for each slider
 CONFIG = read_config("quot/gui/CONFIG.toml")
@@ -211,6 +212,11 @@ class DetectViewer(QWidget):
         self.B_save = QPushButton("Save settings", parent=win_right)
         L_right.addWidget(self.B_save, 8, 1, alignment=widget_align)
         self.B_save.clicked.connect(self.B_save_callback)
+
+        # Show individual spots
+        self.B_show_spots = QPushButton("Show individual spots", parent=win_right)
+        L_right.addWidget(self.B_show_spots, 9, 1, alignment=widget_align)
+        self.B_show_spots.clicked.connect(self.B_show_spots_callback)
 
         ## EMPTY WIDGETS
         for j in range(7, 24):
@@ -591,6 +597,29 @@ class DetectViewer(QWidget):
         """
         print("DetectViewer.B_save_callback: not yet implemented")
 
+    def B_show_spots_callback(self):
+        """
+        Show an array of individual detected spots.
+
+        """
+        # The size of the image grid
+        N = 10
+
+        # Get as many spots as we can to fill this image
+        # grid
+        frame_index = self.frame_slider.value()
+        positions = []
+        images = []
+        while sum([i.shape[0] for i in positions])<N**2 and frame_index<self.ChunkFilter.n_frames:
+            im = self.ChunkFilter.filter_frame(frame_index)
+            pos = detect(im, **self.detect_kwargs)
+            images.append(im)
+            positions.append(pos)
+            frame_index += 1
+
+        # Get as many spots as 
+        ex = ImageSubpositionWindow(images, 
+            positions, w=15, N=9, parent=self)
 
 
 if __name__ == '__main__':
