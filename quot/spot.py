@@ -378,6 +378,15 @@ def min_max(I, w=9, t=200.0, mode='constant', return_filt=False,
     size = (w, w)
     I_filt = ndi.maximum_filter(I, size=size, mode=mode, **kwargs) - \
         ndi.minimum_filter(I, size=size, mode=mode, **kwargs)
+
+    # Set the probability of detection near the border to zero
+    hw = w//2
+    I_filt[:hw,:] = t-1
+    I_filt[:,:hw] = t-1
+    I_filt[-hw:,:] = t-1
+    I_filt[:,-hw:] = t-1
+
+    # Threshold the result
     return threshold_image(I_filt, t=t, return_filt=return_filt)
 
 def gauss_filt_min_max(I, k=1.0, w=9, t=200.0, mode='constant',

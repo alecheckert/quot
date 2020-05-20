@@ -12,14 +12,20 @@ import os
 import numpy as np 
 
 # Main GUI utilities
-from PySide2.QtCore import Qt, QSize 
-from PySide2.QtGui import QPalette, QColor 
+from PySide2.QtCore import Qt, QSize, QRectF
+from PySide2.QtGui import QPalette, QColor, QPainterPath
 from PySide2.QtWidgets import QFileDialog, QSlider, QWidget, \
     QGridLayout, QVBoxLayout, QLabel, QPushButton, QLineEdit, \
     QDialog, QComboBox 
 
 # pyqtgraph utilities
-from pyqtgraph import ImageView 
+from pyqtgraph import ImageView, GraphicsLayoutWidget, RectROI, \
+    ImageItem 
+from pyqtgraph.pgcollections import OrderedDict 
+
+# Master color for all ROIs, spot overlays, etc.
+# Potentially good: #88BDF6, #00DBAB
+MASTER_COLOR = '#88BDF6'
 
 ###############
 ## FUNCTIONS ##
@@ -667,6 +673,70 @@ class FloatSlider(QWidget):
         self.L_max.setText("%.1f" % self.maximum)
         self._set_label_current()
 
+class ROISelectionBox(QDialog):
+    """
+    An ImageItem with a rectangular ROI that allows 
+    selection of a subregion.
+
+    """
+    def __init__(self, image, parent=None):
+        super(ROISelectionBox, self).__init__(parent=parent)
+        self.image = image 
+        self.initUI()
+
+    def initUI(self):
+
+        # Master window
+        lay = QGridLayout(self)
+        self.setWindowTitle("Select ROI")
+
+        # Graphics layout, for showing image and ROI
+        self.w = GraphicsLayoutWidget(show=True, size=(800, 800), 
+            border=True, parent=self)
+        lay.addWidget(self.w, 0, 0)
+        w1 = self.w.addLayout(row=0, col=0)
+        vb = w1.addViewBox(row=0, col=0, lockAspect=True)
+        self.II = ImageItem(self.image)
+        vb.addItem(self.II)
+        self.roi = RectROI([0, 0], [self.image.shape[0], self.image.shape[1]],
+            pen={'color': MASTER_COLOR, 'width': 2})
+        vb.addItem(self.roi)
+
+        # Button to accept current ROI
+        self.B_accept = QPushButton("Accept", parent=self)
+        lay.addWidget(self.B_accept, 1, 0, alignment=Qt.AlignLeft)
+        self.B_accept.clicked.connect(self.B_accept_callback)
+
+        # Show the main window
+        self.resize(self.image.shape[0], self.image.shape[1])
+        self.show()
+
+    def B_accept_callback(self):
+        self.return_val = self.roi.getArraySlice(self.image, self.II)[0]
+        self.accept()
+
+def PromptSelectROI(image, parent=None):
+    """
+    Convenience function. Use ROISelectBox to prompt the user
+    to select an ROI from an image.
+
+    args
+    ----
+        image       :   2D ndarray (YX)
+        parent      :   root QWidget
+
+    returns
+    -------
+        (slice y, slice x), the rectangular ROI slice
+
+    """
+    ex = ROISelectionBox(image, parent=parent)
+    if ex.exec_() == QDialog.Accepted:
+        y_slice, x_slice = ex.return_val
+        return y_slice, x_slice
+    else:
+        return None, None
+
 ###################################
 ## DIALOGS - FILE SELECTION ETC. ##
 ###################################
@@ -873,5 +943,40 @@ def getOpenDirectory(parent, title, initialdir=''):
         parent=q, caption=title, dir=initialdir,
         options=dialog_options)
     return result 
+
+
+#########################
+## CUSTOM SPOT SYMBOLS ##
+#########################
+
+# These can be used as values for the pyqtgraph.ScatterPlotItem
+# "symbol" argument
+Symbols = OrderedDict([(s, QPainterPath()) for s in \
+    ['o', 's', '+', 'alt +', 'open +']])
+
+# A simple circle around the point
+Symbols['o'].addEllipse(QRectF(-0.5, -0.5, 1, 1))
+
+# Square box around the point
+Symbols['s'].addRect(QRectF(-0.5, -0.5, 1, 1))
+
+# Crosshairs
+coords = {
+    '+': [(-0.5, -0.05), (-0.5, 0.05), (-0.05, 0.05), (-0.05, 0.5),
+        (0.05, 0.5), (0.05, 0.05), (0.5, 0.05), (0.5, -0.05),
+        (0.05, -0.05), (0.05, -0.5), (-0.05, -0.5), (-0.05, -0.05)],
+    'alt +': [(-0.5, 0.0), (0.5, 0.0), (0.0, 0.0), (0.0, 0.5),
+        (0.0, -0.5)],
+}
+for k, c in coords.items():
+    Symbols[k].moveTo(*c[0])
+    for x, y in c[1:]:
+        Symbols[k].lineTo(x, y)
+
+# Open crosshairs (empty in the middle)
+for from_, to_ in [[(-0.5, 0.0), (-0.25, 0)], [(0.5,0.0), (0.25,0)],
+    [(0.0,-0.5), (0.0,-0.25)], [(0.0,0.5), (0.0,0.25)]]:
+    Symbols['open +'].moveTo(*from_)
+    Symbols['open +'].lineTo(*to_)
 
 

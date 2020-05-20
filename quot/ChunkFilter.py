@@ -36,11 +36,24 @@ class ChunkFilter(ImageReader):
         4. Load new chunks as necessary.
 
     init
-        path        :   str, path to an image file
-        start       :   int, the start frame when iterating
-        stop        :   int, the stop frame when iterating
-        method      :   str, the filtering method to use
-        chunk_size  :   int, the block size to use for filtering
+        path            :   str, path to an image file
+        start           :   int, the start frame when iterating
+        stop            :   int, the stop frame when iterating
+        method          :   str, the filtering method to use
+        chunk_size      :   int, the block size to use for filtering
+        method_static   :   bool, the method is unlikely to change
+                            during the existence of this ChunkFilter.
+                            This is not true, for instance, when using
+                            the ChunkFilter in a GUI setting where the
+                            user can rapidly change between different 
+                            filtering settings. If False, the ChunkFilter
+                            caches information about the chunk much more
+                            aggressively. This makes switching between 
+                            filtering methods much faster at the cost of 
+                            memory.
+        init_load       :   bool, load the first chunk during init.
+                            Generally keep this True unless you have a 
+                            very good reason not to.
         **method_kwargs :   to the filtering method
 
     attributes
@@ -51,7 +64,7 @@ class ChunkFilter(ImageReader):
 
     """
     def __init__(self, path, start=None, stop=None, method='identity',
-        chunk_size=40, method_static=True, **method_kwargs):
+        chunk_size=40, method_static=True, init_load=True, **method_kwargs):
 
         # Open file reader
         super(ChunkFilter, self).__init__(path, start=start, stop=stop)
@@ -76,7 +89,8 @@ class ChunkFilter(ImageReader):
         self.chunk_start = self.get_chunk_start(self.start)
 
         # Load the initial chunk 
-        self.load_chunk(self.chunk_start)
+        if init_load:
+            self.load_chunk(self.chunk_start)
 
         # Set the method keyword arguments
         self.set_method_kwargs(method=self.method, **method_kwargs)
@@ -120,7 +134,6 @@ class ChunkFilter(ImageReader):
         in a GUI setting.
 
         """
-        print("Generating ChunkFilter cache...")
         if not self.method_static:
             self.cache = {
                 'mean_img': self.chunk.mean(axis=0),
@@ -300,7 +313,6 @@ class ChunkFilter(ImageReader):
         return FILTER_METHODS.get(self.method)(
             self.chunk[frame_index-self.chunk_start], 
             **self.method_kwargs)
-
 
 #######################
 ## FILTERING METHODS ##

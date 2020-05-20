@@ -27,23 +27,30 @@ from ..spot import detect
 # Core GUI utilities
 from PySide2.QtCore import Qt 
 from PySide2.QtWidgets import QApplication, QWidget, QLabel, \
-    QPushButton, QGridLayout, QVBoxLayout
+    QPushButton, QGridLayout, QVBoxLayout, QDialog 
 
 # pyqtgraph utilities for rendering images and spots
 from pyqtgraph import ImageView, ScatterPlotItem 
+from pyqtgraph.graphicsItems import ScatterPlotItem as SPI_base
 
 # Custom GUI utilities
 from .guiUtils import FloatSlider, IntSlider, LabeledQComboBox, \
-    set_dark_app, LabeledImageView, getTextInputs, keys_to_str
+    set_dark_app, LabeledImageView, getTextInputs, keys_to_str, \
+    Symbols, ROISelectionBox, MASTER_COLOR, PromptSelectROI 
 
 # Configuration settings for each slider
 CONFIG = read_config("quot/gui/CONFIG.toml")
 FILTER_SLIDER_CONFIG = CONFIG['filter_slider_config']
 DETECT_SLIDER_CONFIG = CONFIG['detect_slider_config']
 
+# Customize the spot overlay symbols a little
+SPI_base.Symbols['+'] = Symbols['alt +']
+SPI_base.Symbols['open +'] = Symbols['open +']
+symbol_sizes = {'+': 16.0, 'o': 12.0, 'open +': 16.0}
+
 class DetectViewer(QWidget):
     def __init__(self, path, start_frame=0, stop_frame=100,
-        gui_size=800, parent=None):
+        gui_size=900, parent=None, **subregion_kwargs):
         super(DetectViewer, self).__init__(parent)
         self.path = path 
         self.start_frame = start_frame
@@ -51,23 +58,26 @@ class DetectViewer(QWidget):
         self.gui_size = gui_size
 
         # Load the iamge file
-        self.initData()
+        self.initData(**subregion_kwargs)
 
         # Initialize the user interface
         self.initUI()
 
-    def initData(self):
+    def initData(self, **subregion_kwargs):
         """
         Try to load data from the specified image file path. 
 
         """
         # Open an image file reader
         self.ChunkFilter = ChunkFilter(self.path, start=self.start_frame,
-            method_static=False, chunk_size=100)
+            method_static=False, chunk_size=100, init_load=False)
         self.stop_frame = min(self.ChunkFilter.n_frames-1, self.stop_frame)
+        self.ChunkFilter.set_subregion(**subregion_kwargs)
+        self.ChunkFilter.load_chunk(self.start_frame)
 
         # Set the four display images
-        raw_image = self.ChunkFilter.get_frame(self.start_frame)
+        raw_image = self.ChunkFilter.get_subregion(self.start_frame, \
+            **self.ChunkFilter.sub_kwargs)
         self.images = [raw_image, raw_image.copy(), raw_image.copy(), 
             np.zeros(raw_image.shape, dtype=np.uint8)]
 
@@ -81,7 +91,7 @@ class DetectViewer(QWidget):
         # the frame
         self.AR = float(self.ChunkFilter.width) / self.ChunkFilter.height 
         self.gui_height = self.gui_size 
-        self.gui_width = self.gui_height * 2
+        self.gui_width = self.gui_height * 1.75
 
     def initUI(self):
 
@@ -111,6 +121,12 @@ class DetectViewer(QWidget):
         for j in range(1, 4):
             self.LIVs[j].ImageView.view.setXLink(self.LIVs[0].ImageView.view)
             self.LIVs[j].ImageView.view.setYLink(self.LIVs[0].ImageView.view)       
+
+        # Set up three ScatterPlotItems for each of the first three ImageViews,
+        # for overlaying detections as symbols
+        self.SPIs = [ScatterPlotItem() for j in range(3)]
+        for i in range(3):
+            self.SPIs[i].setParentItem(self.LIVs[i].ImageView.imageItem)
 
         ## WIDGETS
 
@@ -175,8 +191,26 @@ class DetectViewer(QWidget):
 
         # Autoscale the detection threshold
         self.B_auto_threshold = QPushButton("Rescale threshold", parent=win_right)
-        L_right.addWidget(self.B_auto_threshold, 5, 1, alignment=widget_align)
+        L_right.addWidget(self.B_auto_threshold, 6, 1, alignment=widget_align)
         self.B_auto_threshold.clicked.connect(self.B_auto_threshold_callback)
+
+        # Overlay detections as symbols
+        self.B_spot_overlay_state = False 
+        self.B_spot_overlay = QPushButton("Overlay detections", parent=win_right)
+        L_right.addWidget(self.B_spot_overlay, 7, 1, alignment=widget_align)
+        self.B_spot_overlay.clicked.connect(self.B_spot_overlay_callback)
+
+        # Change the symbol used for spot overlays
+        symbol_choices = ['+', 'o', 'open +']
+        self.M_symbol = LabeledQComboBox(symbol_choices, "Spot symbol",
+            init_value='o', parent=win_right)
+        L_right.addWidget(self.M_symbol, 5, 1, alignment=widget_align)
+        self.M_symbol.assign_callback(self.M_symbol_callback)
+
+        # Save result to file
+        self.B_save = QPushButton("Save settings", parent=win_right)
+        L_right.addWidget(self.B_save, 8, 1, alignment=widget_align)
+        self.B_save.clicked.connect(self.B_save_callback)
 
         ## EMPTY WIDGETS
         for j in range(7, 24):
@@ -218,10 +252,26 @@ class DetectViewer(QWidget):
             autoHistogramRange  :   bool, reset the LUT histogram range
 
         """
+        # Update the images
         for i in indices:
             self.LIVs[i].setImage(self.images[i], 
                 autoRange=autoRange, autoLevels=autoLevels,
                 autoHistogramRange=autoHistogramRange)
+
+        # Update the scatter plots
+        if self.B_spot_overlay_state and len(self.detections.shape)==2:
+            symbol = self.M_symbol.currentText()
+            for j in range(3):
+                self.SPIs[j].setData(
+                    pos=self.detections+0.5,
+                    size=symbol_sizes[symbol], 
+                    symbol=symbol, 
+                    pen={'color': MASTER_COLOR, 'width': 2},
+                    brush=None, pxMode=False
+                )
+        else:
+            for j in range(3):
+                self.SPIs[j].setData([])
 
     def filter(self):
         """
@@ -315,7 +365,8 @@ class DetectViewer(QWidget):
             frame_index     :   int, the new frame index
 
         """
-        self.images[0] = self.ChunkFilter.get_frame(frame_index)
+        self.images[0] = self.ChunkFilter.get_subregion(frame_index,
+            **self.ChunkFilter.sub_kwargs)
 
     def auto_threshold(self):
         """
@@ -329,9 +380,26 @@ class DetectViewer(QWidget):
             self.images[3] = (self.images[2]>=self.detect_kwargs['t']).astype(np.uint8)
 
             i = self.detect_slider_ids.index('t')
-            self.detect_sliders[i].configure(minimum=self.images[2].min(), 
+            self.detect_sliders[i].configure(minimum=np.percentile(self.images[2], 10), 
                 maximum=self.images[2].max())
             self.detect_sliders[i].setValueBlock(self.detect_kwargs['t'])
+
+    def change_roi(self, **roi_kwargs):
+        """
+        Change the ROI used for filtering.
+
+        """
+        # Update the ChunkFilter, which sets ChunkFilter.sub_kwargs
+        self.ChunkFilter.set_subregion(**roi_kwargs)
+        self.ChunkFilter.load_chunk(self.ChunkFilter.chunk_start)
+
+        # Update the first (raw) image
+        self.load_frame(self.frame_slider.value())
+
+        # Run filtering, detection, and update plots
+        self.filter()
+        self.detect()
+        self.update_images(0, 1, 2, 3)
 
     ######################
     ## WIDGET CALLBACKS ##
@@ -386,7 +454,20 @@ class DetectViewer(QWidget):
         the user to enter a new ROI for this file.
 
         """
-        pass 
+        # Get a maximum intensity projection of the image
+        if not hasattr(self, "max_int_proj"):
+            self.max_int_proj = self.ChunkFilter.max_int_proj(
+                start=0, stop=min(1000, self.ChunkFilter.n_frames))
+
+        # Prompt the user to input an ROI
+        y_slice, x_slice = PromptSelectROI(self.max_int_proj, parent=self)
+
+        # If the user accepts the selection, proceed
+        if not y_slice is None:
+
+            roi_kwargs = {'y0': y_slice.start, 'y1': y_slice.stop-1, 
+                'x0': x_slice.start, 'x1': x_slice.stop-1}
+            self.change_roi(**roi_kwargs)
 
     def filter_slider_callback(self, i):
         """
@@ -481,15 +562,42 @@ class DetectViewer(QWidget):
         Rescale the threshold argument automatically.
 
         """
-        self.detect()
         self.auto_threshold()
+        self.detect()
         self.update_images(2, 3, autoLevels=True, autoHistogramRange=True)
+        if self.B_spot_overlay_state:
+            self.update_images(0, 1)
+
+    def B_spot_overlay_callback(self):
+        """
+        Toggle spot overlay on the image.
+
+        """
+        self.B_spot_overlay_state = not self.B_spot_overlay_state 
+        self.update_images(0, 1, 2)
+
+    def M_symbol_callback(self):
+        """
+        Change the spot overlay symbol.
+
+        """
+        if self.B_spot_overlay_state:
+            self.update_images(0, 1, 2)
+
+    def B_save_callback(self):
+        """
+        Save the current settings to a config file.
+
+        """
+        print("DetectViewer.B_save_callback: not yet implemented")
+
+
 
 if __name__ == '__main__':
     app = QApplication()
     set_dark_app(app)
     ex = DetectViewer('78203_BioPipeline_Run1_20200508_222010_652__Plate000_WellB19_ChannelP95_Seq0035.nd2',
-        start_frame=900, stop_frame=1000)
+        start_frame=900, stop_frame=1000, y0=200, y1=500, x0=200, x1=500)
     sys.exit(app.exec_())
 
 
