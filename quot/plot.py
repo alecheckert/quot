@@ -9,6 +9,9 @@ import numpy as np
 # Core matplotlib library
 import matplotlib.pyplot as plt 
 
+# 3D plots
+from mpl_toolkits.mplot3d import Axes3D
+
 def imshow(*imgs, vmax_mod=1.0):
     """
     Show a variable number of images side-by-side in a 
@@ -32,4 +35,20 @@ def imshow(*imgs, vmax_mod=1.0):
             ax[j].imshow(imgs[j], cmap='gray', vmax=vmax_mod*imgs[j].max())
     plt.show(); plt.close()
 
-    
+def wireframe_overlay(img, model):
+    """
+    Make a overlay of two 2-dimensional functions.
+
+    args
+    ----
+        img, model      :   2D ndarray (YX), with the
+                            same shape 
+
+    """
+    assert img.shape == model.shape 
+    fig = plt.figure(figsize=(4,4))
+    ax = fig.add_subplot(projection='3d')
+    Y, X = np.indices(img.shape)
+    ax.plot_wireframe(X, Y, img, color='k')
+    ax.plot_wireframe(X, Y, model, color='r')
+    plt.show(); plt.close()

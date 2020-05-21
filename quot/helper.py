@@ -6,8 +6,45 @@ quot.helper.py -- low-level utilities
 # Numeric
 import numpy as np 
 
+# Special functions
+from scipy.special import erf 
+
 # Image processing utilities
 from scipy import ndimage as ndi 
+
+# Caching
+from functools import lru_cache 
+
+# Warnings, to filter out warnings for a potentially dangerous
+# division in rs() that is subsequent corrected
+import warnings 
+
+# Profiling
+from time import time 
+
+from .plot import wireframe_overlay
+
+def time_f(f):
+    """
+    Decorator. When executing the decorated function,
+    also print the time to execute.
+
+    args
+    ----
+        f   :   function
+
+    returns
+    -------
+        output of f
+
+    """
+    def g(*args, **kwargs):
+        t0 = time()
+        r = f(*args, **kwargs)
+        t1 = time()
+        print("%f seconds" % (t1-t0))
+        return r 
+    return g
 
 #############
 ## GENERAL ##
@@ -68,6 +105,23 @@ def stable_divide_array(N, D, zero=0.001):
 
     """
     return N/np.clip(D, zero, np.inf)
+
+def stable_divide_float(N, D, inf=0.0):
+    """
+    Divide float N by float D, returning *inf*
+    if *D* is zero.
+
+    args
+    ----
+        N, D    :   float
+        inf     :   float
+
+    returns
+    -------
+        float
+
+    """
+    return (inf if D==0.0 else N/D)
 
 ###############
 ## DETECTION ##
@@ -181,7 +235,917 @@ def threshold_image(I, t=200.0, return_filt=False, mode='max'):
     else:
         return pos 
 
+###########################
+## SUBPIXEL LOCALIZATION ##
+###########################
+
+## LOW-LEVEL SUBPIXEL LOCALIZATION FUNCTIONS
+
+def ring_mean(I):
+    """
+    Take the mean of the outer ring of pixels in 
+    a 2D array.
+
+    args
+    ----
+        I         :   2D ndarray (YX)
+
+    returns
+    -------
+        float, mean
+
+    """
+    return sum([
+        I[0,:-1].mean(), 
+        I[:-1,-1].mean(),
+        I[-1,1:].mean(),
+        I[1:,0].mean(),
+    ])/4.0
+
+def ring_var(I, ddof=0):
+    """
+    Take the variance of the outer ring of pixels in
+    a 2D ndarray.
+
+    args
+    ----
+        I       :   2D ndarray, image
+        ddof    :   int, delta degrees of freedom
+
+    returns
+    -------
+        float, variance estimate
+
+    """
+    return np.concatenate([
+        I[0,1:],
+        I[1:,-1],
+        I[-1,:-1],
+        I[:-1,0]
+    ]).var(ddof=ddof)
+
+def I0_is_crazy(I0, max_I0=10000):
+    """
+    Determine whether the intensity estimate in subpixel
+    localization looks crazy. For many methods, this is 
+    often the first thing to diverge.
+
+    args
+    ----
+        I0  :       float, the intensity estimate for 
+                    subpixel fitting
+        max_I0  :   float, the maximum tolerated intensity
+
+    returns
+    -------
+        bool, True if crazy 
+
+    """
+    return (I0>=0) and (I0<=max_I0)
+
+def estimate_I0(I, y, x, bg, sigma=1.0):
+    """
+    Estimate the integrated intensity of a 2D integrated 
+    Gaussian PSF. This model has four parameters - y, x,
+    I0, and bg - so with y, x, and bg constrained, we can 
+    solve for I0 directly.
+
+    In this method, we use the brightest pixel in 
+    the image to solve for I0 given the PSF model.
+    This is easy but often an overestimate in the presence
+    of Poisson noise.
+
+    args
+    ----
+        I       :   2D ndarray, the PSF image
+        y, x    :   float, center of PSF in y and x
+        bg      :   float, estimated background intensity
+                        per pixel (AU)
+        sigma   :   float, 2D integrated Gaussian PSF 
+                        radius
+
+    returns
+    -------
+        float, estimate for I0
+
+    """
+    # Get the index of the brightest pixel
+    ym, xm = np.unravel_index(np.argmax(I), I.shape)
+
+    # Evaluate the intensity estimate
+    return stable_divide_float(
+        I[ym,xm] - bg,
+        int_gauss_psf_1d(ym, y, sigma=sigma) * \
+            int_gauss_psf_1d(xm, x, sigma=sigma),
+        inf=np.nan 
+    )
+
+def estimate_I0_multiple_points(I, y, x, bg, sigma=1.0):
+    """
+    Estimate the integrated intensity of a 2D integrated 
+    Gaussian PSF. This model has four parameters - y, x,
+    I0, and bg - so with y, x, and bg constrained, we can 
+    solve for I0 directly.
+
+    In this method, we use the intensities at the 3x3 
+    central points in the image window to obtain nine 
+    estimates for I0, then average them for the final 
+    estimate. This is more accurate than estimate_I0()
+    but is slower. Probably overkill for a first guess.
+
+    args
+    ----
+        I       :   2D ndarray, the PSF image
+        y, x    :   float, center of PSF in y and x
+        bg      :   float, estimated background intensity
+                        per pixel (AU)
+        sigma   :   float, 2D integrated Gaussian PSF 
+                        radius
+
+    returns
+    -------
+        float, estimate for I0
+
+    """
+    # Get the three central points in the spot window
+    # and their coordinates
+    wy, wx = I.shape
+    hwy = wy//2
+    hwx = wx//2
+    Y, X = indices(wy, wx)
+    sy = slice(hwy-1, hwy+2)
+    sx = slice(hwx-1, hwx+2)
+    obs_I = I[sy, sx].ravel()
+    cen_y = Y[sy, sx].ravel()
+    cen_x = X[sy, sx].ravel()
+
+    return stable_divide_array(
+        obs_I - bg,
+        int_gauss_psf_1d(cen_y, y, sigma=sigma) * \
+            int_gauss_psf_1d(cen_x, x, sigma=sigma)
+    ).mean()
+
+def amp_from_I(I0, sigma=1.0):
+    """
+    Given a 2D Gaussian PSF, return the PSF
+    peak amplitude given the intensity `I0`.
+    `I0` is equal to the PSF integrated above
+    background, while `amp` is equal to the PSF
+    evaluated at its maximum.
+
+    args
+    ----
+         I0      : float, intensity estimate
+         sigma   : float, width of Gaussian
+
+    returns
+    -------
+        float, amplitude estimate
+
+    """
+    return I0/(2*np.pi*(sigma**2))
+
+def estimate_snr(I, I0):
+    """
+    Estimate the signal-to-noise ratio of a PSF, 
+    given an estimate *I0* for its intensity.
+
+    args
+    ----
+        I       :   2D ndarray, the PSF image
+        I0      :   float, intensity estimate
+
+    returns
+    -------
+        float, SNR estimate
+
+    """
+    return stable_divide_float(
+        amp_from_I(I0)**2, ring_var(I, ddof=1),
+        inf=np.inf)
+
+def invert_hessian(H, ridge=0.0001):
+    """
+    Invert a Hessian with ridge regularization to 
+    stabilize the inversion.
+
+    args
+    ----
+        H       :   2D ndarray, shape (n, n)
+        ridge   :   float, regularization term
+
+    returns
+    -------
+        2D ndarray, shape (n, n), the 
+            inverted Hessian
+
+    """
+    D = np.diag(np.ones(H.shape[0])*ridge)
+    while 1:
+        try:
+            H_inv = np.linalg.inv(H-D)
+            return H_inv 
+        except (ZeroDivisionError, np.linalg.linalg.LinAlgError):
+            D *= 10 
+            continue 
+
+def check_2d_gauss_fit(img_shape, pars, max_I0=10000):
+    """
+    Check whether the fit parameters for a 2D symmetric 
+    Gaussian with static sigma are sane.
+
+    This includes:
+        - Are the y and x coordinates inside the PSF
+            window?
+        - Are there negative intensities?
+        - Are there crazily high intensities?
+
+    args
+    ----
+        img_shape       :   (int, int), the PSF image shape
+        pars            :   1D ndarray, (y, x, I0, bg), the
+                            fit parameters
+        max_I0          :   float, maximum tolerated intensity
+
+    returns
+    -------
+        bool, True if the fit passes the checks
+
+    """
+    return all([
+        pars[0]>=0,
+        pars[1]>=0,
+        pars[0]<img_shape[0],
+        pars[1]<img_shape[1],
+        pars[2]>=0,
+        pars[2]<=max_I0,
+        pars[3]>=0
+    ])
+
+## PSF DEFINITIONS
+
+@lru_cache(maxsize=1)
+def psf_int_proj_denom(sigma):
+    """
+    Convenience function to produce the denominator
+    for the Gaussian functions in int_gauss_psf_1d().
+
+    args
+    ----
+        sigma   :   float
+
+    returns
+    -------
+        float, np.sqrt(2 * (sigma**2))
+
+    """
+    return np.sqrt(2*(sigma**2))
 
 
+@lru_cache(maxsize=1)
+def indices(size_y, size_x):
+    """
+    Convenience wrapper for np.indices.
+
+    args
+    ----
+        size_y  :   int, the number of indices
+                    in the y direction
+        size_x  :   int, the number of indices
+                    in the x direction
+
+    returns
+    -------
+        (
+            2D ndarray, the Y indices of each pixel;
+            2D ndarray, the X indices of each pixel
+        )
+
+    """
+    return np.indices((size_y, size_x))
+
+@lru_cache(maxsize=1)
+def indices_1d(size_y, size_x):
+    """
+    Cached convenience function to generate two
+    sets of 1D indices.
+
+    args
+    ----
+        size_y      :   int, the number of indices
+                        in the y direction
+        size_x      ;   int, the number of indices
+                        in the x direction
+
+    returns
+    -------
+        (
+            1D ndarray, the Y indices of each pixel;
+            1D ndarray, the X indices of each pixel
+        )
+
+    """
+    return np.arange(size_y).astype('float64'), \
+        np.arange(size_x).astype('float64')
+
+def int_gauss_psf_1d(Y, yc, sigma=1.0):
+    """
+    Return a 2D integrated Gaussian PSF with unit 
+    intensity, projected onto one of the axes. 
+
+    args
+    ----
+        Y       :   1D ndarray, coordinates along the axis
+        yc      :   float, PSF center
+        sigma   :   float, Gaussian sigma
+
+    returns
+    -------
+        1D ndarray, the intensities projected along
+            each row of pixels
+
+    """
+    S = psf_int_proj_denom(sigma)
+    return 0.5*(erf((Y+0.5-yc)/S) - \
+        erf((Y-0.5-yc)/S))
+
+def int_gauss_psf_2d(size_y, size_x, yc, xc, I0, sigma=1.0):
+    """
+    Return a 2D integrated Gaussian PSF with intensity I0.
+    Does not include a background term.
+
+    args
+    ----
+        size_y  :   int, the number of pixels in the y
+                    direction
+        size_x  :   int, the number of pixels in the x
+                    direction
+        yc      :   float, center of PSF in y
+        xc      :   float, center of PSF in x
+        sigma   :   float, PSF width 
+
+    returns
+    -------
+        2D ndarray of shape (size_y, size_x), the 
+            PSF 
+
+    """
+    Y, X = indices_1d(size_y, size_x)
+    return I0*np.outer(
+        int_gauss_psf_1d(Y, yc, sigma=sigma),
+        int_gauss_psf_1d(X, xc, sigma=sigma),
+    )
+
+def int_gauss_psf_deriv_1d(Y, yc, sigma=1.0):
+    """
+    Evaluate the derivative of an integrated Gaussian
+    PSF model with unit intensity projected onto 1 axis
+    with respect to its axis variable.
+
+    args
+    ----
+        Y       :   1D ndarray, the pixel indices at 
+                    which to evaluate the PSF 
+        yc      :   float, the spot center
+        sigma   :   float, Gaussian sigma
+
+    returns
+    -------
+        1D ndarray, the derivative of the projection
+            with respect to the axis variable at 
+            each pixel
+
+    """
+    A, B = psf_point_proj_denom(sigma)
+    return (np.exp(-(Y-0.5-yc)**2 / A) - \
+        np.exp(-(Y+0.5-yc)**2 / A)) / B
+
+@lru_cache(maxsize=1)
+def psf_point_proj_denom(sigma):
+    """
+    Convenience function to produce the denominator
+    for the Gaussian functions in psf_point_psf_1d().
+
+    args
+    ----
+        sigma   :   float, Gaussian sigma
+
+    returns
+    -------
+        float, float
+
+    """
+    S = 2*(sigma**2)
+    return S, np.sqrt(np.pi*S)
+
+def point_gauss_psf_1d(Y, yc, sigma=1.0):
+    """
+    Evaluate a 1D point Gaussian with unit intensity
+    at a set of points.
+
+    args
+    ----
+        Y       :   1D ndarray, coordinates along the axis
+        yc      :   float, PSF center
+        sigma   :   float, Gaussian sigma
+
+    returns
+    -------
+        1D ndarray, the intensities projected along
+            each row of pixels
+
+    """
+    A, B = psf_point_proj_denom(sigma)
+    return np.exp(-(Y-yc)**2 / A) / B 
+
+def point_gauss_psf_2d(size_y, size_x, yc, xc, 
+    I0, sigma=1.0):
+    """
+    Return a 2D pointwise-evaluated Gaussian PSF
+    with intensity I0.
+
+    args
+    ----
+        size_y      :   int, size of the PSF subwindow
+                        in y 
+        size_x      :   int, size of the PSF subwindow
+                        in x
+        yc          :   float, PSF center in y 
+        xc          :   float, PSF center in x
+        I0          :   float, PSF intensity 
+        sigma       :   float, Gaussian sigma
+
+    returns
+    -------
+        2D ndarray, the PSF model
+
+    """
+    Y, X = indices_1d(size_y, size_x)
+    return I0*np.outer(
+        point_gauss_psf_1d(Y, yc, sigma=sigma),
+        point_gauss_psf_1d(X, xc, sigma=sigma),
+    )
+
+## CORE FITTING ROUTINES
+
+def rs(psf_image):
+    """
+    Localize the center of a PSF using the radial 
+    symmetry method.
+
+    Originally conceived by the criminally underrated
+    Parasarathy R Nature Methods 9, pgs 724–726 (2012).
+
+    args
+    ----
+        psf_image : 2D ndarray, PSF subwindow
+
+    returns
+    -------
+        float y estimate, float x estimate
+
+    """
+    # Get the size of the image frame and build
+    # a set of pixel indices to match
+    N, M = psf_image.shape
+    N_half = N // 2
+    M_half = M // 2
+    ym, xm = np.mgrid[:N-1, :M-1]
+    ym = ym - N_half + 0.5
+    xm = xm - M_half + 0.5 
+    
+    # Calculate the diagonal gradients of intensities across each
+    # corner of 4 pixels
+    dI_du = psf_image[:N-1, 1:] - psf_image[1:, :M-1]
+    dI_dv = psf_image[:N-1, :M-1] - psf_image[1:, 1:]
+    
+    # Smooth the image to reduce the effect of noise, at the cost
+    # of a little resolution
+    fdu = ndi.uniform_filter(dI_du, 3)
+    fdv = ndi.uniform_filter(dI_dv, 3)
+    
+    dI2 = (fdu ** 2) + (fdv ** 2)
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        m = -(fdv + fdu) / (fdu - fdv)
+        
+    # For pixel values that blow up, instead set them to a very
+    # high float
+    m[np.isinf(m)] = 9e9
+    
+    b = ym - m * xm
+
+    sdI2 = dI2.sum()
+    ycentroid = (dI2 * ym).sum() / sdI2
+    xcentroid = (dI2 * xm).sum() / sdI2
+    w = dI2 / np.sqrt((xm - xcentroid)**2 + (ym - ycentroid)**2)
+
+    # Correct nan / inf values
+    w[np.isnan(m)] = 0
+    b[np.isnan(m)] = 0
+    m[np.isnan(m)] = 0
+
+    # Least-squares analytical solution to the point of 
+    # maximum radial symmetry, given the slopes at each
+    # edge of 4 pixels
+    wm2p1 = w / ((m**2) + 1)
+    sw = wm2p1.sum()
+    smmw = ((m**2) * wm2p1).sum()
+    smw = (m * wm2p1).sum()
+    smbw = (m * b * wm2p1).sum()
+    sbw = (b * wm2p1).sum()
+    det = (smw ** 2) - (smmw * sw)
+    xc = (smbw*sw - smw*sbw)/det
+    yc = (smbw*smw - smmw*sbw)/det
+
+    # Adjust coordinates so that they're relative to the
+    # edge of the image frame
+    yc = (yc + (N + 1) / 2.0) - 1
+    xc = (xc + (M + 1) / 2.0) - 1
+
+    return yc, xc
+
+def fit_ls_int_gaussian(img, guess, sigma=1.0, ridge=0.0001, 
+    max_iter=20, damp=0.3, convergence=1.0e-4, divergence=1.0):
+    """
+    Given an observed spot, estimate the maximum likelihood
+    parameters for a 2D integrated Gaussian PSF sampled with
+    normally-distributed noise. Here, we use a Levenberg-
+    Marquardt procedure to find the ML parameters.
+
+    The model parameters are (y, x, I0, bg), where y, x
+    is the spot center, I0 is the integrated intensity, and
+    bg is the average background per pixel.
+
+    The function also returns several parameters that are 
+    useful for quality control on the fits.
+
+    args
+    ----
+        img     :   2D ndarray, the observed PSF 
+        guess   :   1D ndarray of shape (4), the initial
+                    guess for y, x, I0, and bg
+        sigma   :   float, Gaussian PSF width 
+        ridge   :   float, initial regularization term
+                    for inversion of the Hessian
+        max_iter:   int, the maximum number of iterations
+                    tolerated
+        damp    :   float, damping factor for update vector.
+                    Larger means faster convergence but
+                    also more unstable.
+        convergence :   float, the criterion for fit
+                    convergence. Only y and x are tested
+                    for convergence.
+        divergence  :   float, the criterion for fit
+                    divergence. Fitting is terminated
+                    when this is reached. CURRENTLY NOT
+                    IMPLEMENTED.
+
+    returns
+    -------
+        (
+            1D ndarray, the final parameter estimate;
+
+            1D ndarray, the estimated error in each
+                parameter (square root of the inverse
+                Hessian diagonal);
+
+            float, the Hessian determinant;
+
+            float, the root mean squared deviation of the
+                final PSF model from the observed PSF;
+
+            int, the number of iterations
+        )
+
+    """
+    n_pixels = img.shape[0] * img.shape[1]
+
+    # 1D indices for each pixel
+    index_y, index_x = indices_1d(*img.shape)
+
+    # Update vector
+    update = np.ones(4, dtype='float64')
+
+    # Current parameter set
+    pars = guess.copy()
+
+    # Continue improving guess until convergence
+    iter_idx = 0
+    while iter_idx<max_iter and (np.abs(update[:2])>convergence).any():
+
+        # Evaluate the PSF model and its derivatives projected
+        # onto each of the two axes
+        proj_y = int_gauss_psf_1d(index_y, pars[0], sigma=sigma)
+        proj_x = int_gauss_psf_1d(index_x, pars[1], sigma=sigma)
+
+        # Evaluate the derivatives of the model with respect to
+        # the Y and X axies
+        dproj_y_dy = int_gauss_psf_deriv_1d(index_y, pars[0], sigma=sigma)
+        dproj_x_dx = int_gauss_psf_deriv_1d(index_x, pars[1], sigma=sigma)
+
+        # Evaluate the model Jacobian
+        J = np.asarray([
+            (pars[2] * np.outer(dproj_y_dy, proj_x)).ravel(),
+            (pars[2] * np.outer(proj_y, dproj_x_dx)).ravel(),
+            (np.outer(proj_y, proj_x)).ravel(),
+            np.ones(n_pixels)
+        ]).T 
+
+        # Evaluate the model 
+        model = pars[2] * J[:,2] + pars[3]
+
+        # Estimate the noise variance
+        devs = img.ravel() - model 
+        sig2 = (devs**2).mean()
+
+        # Get the gradient of the log-likelihood
+        grad = (J.T * devs).sum(axis=1) / sig2 
+
+        # Evaluate and invert the Hessian
+        H_inv = invert_hessian(J.T@J/sig2, ridge=ridge)
+
+        # Get the update vector
+        update[:] = H_inv @ grad
+
+        # Apply the update to parameter estimate 
+        pars = pars + damp * update 
+        iter_idx += 1
+
+    # Estimate the error with the inverse Hessian
+    err = np.sqrt(np.diagonal(H_inv))
+
+    # Evaluate the Hessian determinant, which is 
+    # also useful as a metric of error
+    return pars, err, np.linalg.det(H_inv), np.sqrt(sig2), iter_idx
+
+def fit_ls_point_gaussian(img, guess, sigma=1.0, ridge=0.0001, 
+    max_iter=20, damp=0.3, convergence=1.0e-4, divergence=1.0):
+    """
+    Given an observed spot, estimate the maximum likelihood
+    parameters for a 2D pointwise-evaluated Gaussian PSF 
+    sampled with normally-distributed noise. This function
+    uses a Levenberg-Marquardt procedure to find the ML 
+    parameters.
+
+    The underlying model for the pointwise-evaluated and 
+    integrated Gaussian PSFs is identical - a symmetric 2D
+    Gaussian. The distinction is how they handle sampling
+    on discrete pixels:
+
+        - the point Gaussian takes the value on each pixel
+            to be equal to the Gaussian evaluated at the 
+            center of the pixel
+
+        - the integrated Gaussian takes the value on each 
+            pixel to be equal to the Gaussian integrated
+            across the whole area of that pixel
+
+    Integrated Gaussians are more accurate and less prone
+    to edge biases, but the math is slightly more 
+    complicated and fitting is slower as a result.
+
+    The model parameters are (y, x, I0, bg), where y, x
+    is the spot center, I0 is the integrated intensity, and
+    bg is the average background per pixel.
+
+    The function also returns several parameters that are 
+    useful for quality control on the fits.
+
+    args
+    ----
+        img     :   2D ndarray, the observed PSF 
+        guess   :   1D ndarray of shape (4), the initial
+                    guess for y, x, I0, and bg
+        sigma   :   float, Gaussian PSF width 
+        ridge   :   float, initial regularization term
+                    for inversion of the Hessian
+        max_iter:   int, the maximum number of iterations
+                    tolerated
+        damp    :   float, damping factor for update vector.
+                    Larger means faster convergence but
+                    also more unstable.
+        convergence :   float, the criterion for fit
+                    convergence. Only y and x are tested
+                    for convergence.
+        divergence  :   float, the criterion for fit
+                    divergence. Fitting is terminated
+                    when this is reached. CURRENTLY NOT
+                    IMPLEMENTED.
+
+    returns
+    -------
+        (
+            1D ndarray, the final parameter estimate;
+
+            1D ndarray, the estimated error in each
+                parameter (square root of the inverse
+                Hessian diagonal);
+
+            float, the Hessian determinant;
+
+            float, the root mean squared deviation of the
+                final PSF model from the observed PSF;
+
+            int, the number of iterations
+        )
+
+    """
+    S2 = sigma**2
+    n_pixels = img.shape[0] * img.shape[1]
+
+    # 1D indices for each pixel
+    index_y, index_x = indices_1d(*img.shape)
+
+    # Update vector
+    update = np.ones(4, dtype='float64')
+
+    # Current parameter set
+    pars = guess.copy()
+
+    # Continue improving guess until convergence
+    iter_idx = 0
+    while iter_idx<max_iter and (np.abs(update[:2])>convergence).any():
+
+        # Evaluate a unit intensity Gaussian projected onto each
+        # axis
+        psf_1d_y = point_gauss_psf_1d(index_y, pars[0], sigma=sigma)
+        psf_1d_x = point_gauss_psf_1d(index_x, pars[1], sigma=sigma)
+
+        # Evaluate the derivatives of the model with respect to
+        # the Y and X axes
+        dpsf_1d_y_dy = (index_y-pars[0]) * psf_1d_y / S2
+        dpsf_1d_x_dx = (index_x-pars[1]) * psf_1d_x / S2 
+
+        # Evaluate the model Jacobian
+        J = np.asarray([
+            (pars[2] * np.outer(dpsf_1d_y_dy, psf_1d_x)).ravel(),
+            (pars[2] * np.outer(psf_1d_y, dpsf_1d_x_dx)).ravel(),
+            (np.outer(psf_1d_y, psf_1d_x)).ravel(),
+            np.ones(n_pixels)
+        ]).T 
+
+        # Evaluate the model 
+        model = pars[2] * J[:,2] + pars[3]
+
+        # Estimate the noise variance
+        devs = img.ravel() - model 
+        sig2 = (devs**2).mean()
+
+        # Get the gradient of the log-likelihood under a
+        # normally-distributed noise model
+        grad = (J.T * devs).sum(axis=1) / sig2 
+
+        # Evaluate and invert the Hessian
+        H_inv = invert_hessian(J.T@J/sig2, ridge=ridge)
+
+        # Get the update vector
+        update[:] = H_inv @ grad
+
+        # Apply the update to parameter estimate 
+        pars = pars + damp * update 
+        iter_idx += 1
+
+    # Estimate the error with the inverse Hessian
+    err = np.sqrt(np.diagonal(H_inv))
+
+    # Evaluate the Hessian determinant, which is 
+    # also useful as a metric of error
+    return pars, err, np.linalg.det(H_inv), np.sqrt(sig2), iter_idx
+
+def fit_poisson_int_gaussian(img, guess, sigma=1.0, ridge=0.0001, 
+    max_iter=20, damp=0.3, convergence=1.0e-4, divergence=1.0):
+    """
+    Given an observed spot, estimate the maximum likelihood
+    parameters for a 2D integrated Gaussian PSF model sampled
+    with Poisson noise, using a Levenberg-Marquardt procedure.
+
+    While LM with Poisson noise is a little slower than LS
+    routines, it is the most accurate model for the noise on 
+    EMCCD cameras.
+
+    The model parameters are (y, x, I0, bg), where y, x
+    is the spot center, I0 is the integrated intensity, and
+    bg is the average background per pixel.
+
+    The function also returns several parameters that are 
+    useful for quality control on the fits.
+
+    args
+    ----
+        img     :   2D ndarray, the observed PSF 
+        guess   :   1D ndarray of shape (4), the initial
+                    guess for y, x, I0, and bg
+        sigma   :   float, Gaussian PSF width 
+        ridge   :   float, initial regularization term
+                    for inversion of the Hessian
+        max_iter:   int, the maximum number of iterations
+                    tolerated
+        damp    :   float, damping factor for update vector.
+                    Larger means faster convergence but
+                    also more unstable.
+        convergence :   float, the criterion for fit
+                    convergence. Only y and x are tested
+                    for convergence.
+        divergence  :   float, the criterion for fit
+                    divergence. Fitting is terminated
+                    when this is reached. CURRENTLY NOT
+                    IMPLEMENTED.
+
+    returns
+    -------
+        (
+            1D ndarray, the final parameter estimate;
+
+            1D ndarray, the estimated error in each
+                parameter (square root of the inverse
+                Hessian diagonal);
+
+            float, the Hessian determinant;
+
+            float, the root mean squared deviation of the
+                final PSF model from the observed PSF;
+
+            int, the number of iterations
+        )
+
+    """
+    n_pixels = img.shape[0] * img.shape[1]
+    img_ravel = img.ravel()
+
+    # 1D indices for each pixel
+    index_y, index_x = indices_1d(*img.shape)
+
+    # Update vector
+    update = np.ones(4, dtype='float64')
+
+    # Current parameter set
+    pars = guess.copy()
+
+    # Instantiate the Hessian
+    H = np.empty((4, 4), dtype='float64')
+
+    # Continue improving guess until convergence
+    iter_idx = 0
+    while iter_idx<max_iter and (np.abs(update[:2])>convergence).any():
+
+        # Evaluate the PSF model and its derivatives projected
+        # onto each of the two axes
+        proj_y = int_gauss_psf_1d(index_y, pars[0], sigma=sigma)
+        proj_x = int_gauss_psf_1d(index_x, pars[1], sigma=sigma)
+
+        # Evaluate the derivatives of the model with respect to
+        # the Y and X axies
+        dproj_y_dy = int_gauss_psf_deriv_1d(index_y, pars[0], sigma=sigma)
+        dproj_x_dx = int_gauss_psf_deriv_1d(index_x, pars[1], sigma=sigma)
+
+        # Evaluate the model Jacobian
+        J = np.asarray([
+            (pars[2] * np.outer(dproj_y_dy, proj_x)).ravel(),
+            (pars[2] * np.outer(proj_y, dproj_x_dx)).ravel(),
+            (np.outer(proj_y, proj_x)).ravel(),
+            np.ones(n_pixels)
+        ]).T 
+
+        # Evaluate the model 
+        model = pars[2] * J[:,2] + pars[3]
+
+        # if debug:
+        #     print('iter: %d' % iter_idx)
+        #     wireframe_overlay(img, model.reshape(img.shape))
+
+        # Get the gradient of the log-likelihood
+        grad = (J.T * ((img_ravel/model) - 1.0)).sum(axis=1)
+
+        # Evaluate and invert the Hessian
+        H_factor = -(img_ravel / (model**2))
+        for i in range(4):
+            for j in range(i, 4):
+                H[i,j] = (H_factor * J[:,i] * J[:,j]).sum()
+                if j > i:
+                    H[j,i] = H[i,j]
+        H_inv = invert_hessian(H, ridge=ridge)
+
+        # Get the update vector
+        update[:] = -H_inv @ grad
+
+        # Apply the update to parameter estimate 
+        pars = pars + damp * update 
+        iter_idx += 1
+
+    # if debug:
+    #     print('final:')
+    #     wireframe_overlay(img, model.reshape(img.shape))
+
+    # Estimate the error with the inverse Hessian
+    err = np.sqrt(np.diagonal(-H_inv))
+
+    # Get the root mean squared deviation of the final
+    # model from the observed spot
+    rmse = ((model - img_ravel)**2).mean()
+
+    # Evaluate the Hessian determinant, which is 
+    # also useful as a metric of error
+    return pars, err, np.linalg.det(H_inv), rmse, iter_idx
 
 
