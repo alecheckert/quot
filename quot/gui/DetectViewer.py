@@ -168,6 +168,11 @@ class DetectViewer(QWidget):
         L_right.addWidget(self.B_change_roi, 6, 0, alignment=widget_align)
         self.B_change_roi.clicked.connect(self.B_change_roi_callback)
 
+        # Button to change frame range
+        self.B_change_frame_range = QPushButton("Change frame range", win_right)
+        L_right.addWidget(self.B_change_frame_range, 7, 0, alignment=widget_align)
+        self.B_change_frame_range.clicked.connect(self.B_change_frame_range_callback)
+
         # Select detection method
         detect_methods = keys_to_str(DETECT_SLIDER_CONFIG.keys())
         self.M_detect = LabeledQComboBox(detect_methods, "Detect method",
@@ -219,7 +224,7 @@ class DetectViewer(QWidget):
         self.B_show_spots.clicked.connect(self.B_show_spots_callback)
 
         ## EMPTY WIDGETS
-        for j in range(7, 24):
+        for j in range(8, 24):
             _ql = QLabel(win_right)
             L_right.addWidget(_ql, j, 0, alignment=widget_align)
 
@@ -474,6 +479,35 @@ class DetectViewer(QWidget):
             roi_kwargs = {'y0': y_slice.start, 'y1': y_slice.stop-1, 
                 'x0': x_slice.start, 'x1': x_slice.stop-1}
             self.change_roi(**roi_kwargs)
+
+    def B_change_frame_range_callback(self):
+        """
+        Change the frame range.
+
+        """
+        # Prompt the user to select a start frame and stop frame
+        names = ['Start frame (min 0)', 'Stop frame (max %d)' % \
+            (self.ChunkFilter.n_frames-1)]
+        defaults = [0, 100]
+        start_frame, stop_frame = getTextInputs(names, defaults, title='Select frame range')
+
+        # Update the ChunkFilter
+        self.ChunkFilter.start = start_frame
+        self.ChunkFilter._init_chunks()
+        self.ChunkFilter.load_chunk(start_frame)
+
+        # Update frame slider
+        self.frame_slider.configure(minimum=start_frame, maximum=stop_frame,
+            interval=1, init_value=start_frame)
+
+        # Rerun filtering and detection        
+        self.load_frame(start_frame)
+        self.filter()
+        self.detect()
+
+        # Update the plots
+        self.update_images(0, 1, 2, 3, autoRange=True, autoLevels=True,
+            autoHistogramRange=True)
 
     def filter_slider_callback(self, i):
         """

@@ -53,7 +53,7 @@ def gauss(I, k=1.0, w=9, t=200.0, return_filt=False):
     """
     # Compute the transfer function
     G_rft = _gauss_setup(*I.shape, k, w)
-    return threshold_image(fftshift(irfft2(rfft2(I)*G_rft)), 
+    return threshold_image(fftshift(irfft2(rfft2(I)*G_rft, s=I.shape)), 
         t=t, return_filt=return_filt)
 
 @lru_cache(maxsize=1)
@@ -108,7 +108,7 @@ def centered_gauss(I, k=1.0, w=9, t=200.0, return_filt=False):
     """
     # Compute the transfer function
     G_rft = _centered_gauss_setup(*I.shape, k, w)
-    return threshold_image(fftshift(irfft2(rfft2(I)*G_rft)), 
+    return threshold_image(fftshift(irfft2(rfft2(I)*G_rft, s=I.shape)), 
         t=t, return_filt=return_filt)
 
 @lru_cache(maxsize=1)
@@ -166,7 +166,7 @@ def mle_amp(I, k=1.0, w=9, t=200.0, return_filt=False):
     G_rft, Sgc2 = _mle_amp_setup(*I.shape, k, w)
 
     # Perform filtering
-    return threshold_image((fftshift(irfft2(rfft2(I)*G_rft))**2)/Sgc2, 
+    return threshold_image((fftshift(irfft2(rfft2(I)*G_rft, s=I.shape))**2)/Sgc2, 
         t=t, return_filt=return_filt)
 
 @lru_cache(maxsize=1)
@@ -231,7 +231,7 @@ def dog(I, k0=1.0, k1=3.0, w=9, t=200.0, return_filt=False):
     dog_tf = _dog_setup(*I.shape, k0, k1, w)
 
     # Perform the convolution
-    return threshold_image(fftshift(irfft2(rfft2(I)*dog_tf)), 
+    return threshold_image(fftshift(irfft2(rfft2(I)*dog_tf, s=I.shape)), 
         t=t, return_filt=return_filt)
 
 @lru_cache(maxsize=1)
@@ -290,7 +290,7 @@ def log(I, k=1.0, w=11, t=200.0, return_filt=False):
     G_rft = _log_setup(*I.shape, k, w)
 
     # Perform the convolution
-    return threshold_image(fftshift(irfft2(rfft2(I)*G_rft)), 
+    return threshold_image(fftshift(irfft2(rfft2(I)*G_rft, s=I.shape)), 
         t=t, return_filt=return_filt)
 
 def _log_setup(H, W, k, w):
@@ -424,7 +424,7 @@ def gauss_filt_min_max(I, k=1.0, w=9, t=200.0, mode='constant',
 
     # Perform the convolution and do min/max filtering on
     # the result
-    return min_max(fftshift(irfft2(rfft2(I)*G_rft)),
+    return min_max(fftshift(irfft2(rfft2(I)*G_rft, s=I.shape)),
         w=w, t=t, mode=mode, return_filt=return_filt, **kwargs)
 
 def llr(I, k=1.0, w=9, t=20.0, return_filt=False):
@@ -463,7 +463,7 @@ def llr(I, k=1.0, w=9, t=20.0, return_filt=False):
     # Perform the convolutions for detection
     A = ndi.uniform_filter(I, w)
     B = ndi.uniform_filter(I**2, w)
-    C = fftshift(irfft2(rfft2(I)*G_rft))**2
+    C = fftshift(irfft2(rfft2(I)*G_rft, s=I.shape))**2
 
     # Evaluate the log likelihood ratio for presence of a Gaussian spot
     L = 1.0 - stable_divide_array(C, n_pixels*Sgc2*(B-A**2), zero=0.001)
@@ -550,8 +550,35 @@ METHODS = {
     'llr_rect': llr_rect,
 }
 
-# Generate the wrapper for all detection methods
-detect = assign_methods(METHODS)(lambda I, **kwargs: None)
+def detect(I, method=None, **kwargs):
+    """
+    Run spot detection on a single image according to a
+    detection method.
+
+    args
+    ----
+        I       :   2D ndarray (YX), image frame
+        method  :   str, a method name in METHODS
+        kwargs  :   special argument to the method
+
+    returns
+    -------
+        2D ndarray of shape (n_spots, 2), the Y and 
+            X coordinates of identified spots
+
+    """
+    # Get the desired method
+    method_f = METHODS.get(method)
+    if method_f is None:
+        raise KeyError("Method %s not available; available " \
+            "methods are %s" % (method, ", ".join(METHODS.keys())))
+
+    # Enforce float64, required for some methods
+    I = I.astype(np.float64)
+
+    # Run detection
+    return method_f(I, **kwargs)
+
 
 
 

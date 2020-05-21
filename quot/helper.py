@@ -81,10 +81,11 @@ def assign_methods(methods):
     """ 
     def dec(f):
         def apply_method(*args, method=None, **kwargs):
+            print(method)
             method_f = methods.get(method)
             if method_f is None:
-                raise KeyError("Available methods are {}".format(
-                    ", ".join(methods.keys())))
+                raise KeyError("Method %s not found; available methods are %s" % (
+                    method, ", ".join(methods.keys())))
             return method_f(*args, **kwargs)
         return apply_method
     return dec
@@ -863,17 +864,17 @@ def fit_ls_int_gaussian(img, guess, sigma=1.0, ridge=0.0001,
         grad = (J.T * devs).sum(axis=1) / sig2 
 
         # Evaluate and invert the Hessian
-        H_inv = invert_hessian(J.T@J/sig2, ridge=ridge)
+        H_inv = invert_hessian(-J.T@J/sig2, ridge=ridge)
 
         # Get the update vector
-        update[:] = H_inv @ grad
+        update[:] = -H_inv @ grad
 
         # Apply the update to parameter estimate 
         pars = pars + damp * update 
         iter_idx += 1
 
     # Estimate the error with the inverse Hessian
-    err = np.sqrt(np.diagonal(H_inv))
+    err = np.sqrt(np.diagonal(-H_inv))
 
     # Evaluate the Hessian determinant, which is 
     # also useful as a metric of error
@@ -997,17 +998,17 @@ def fit_ls_point_gaussian(img, guess, sigma=1.0, ridge=0.0001,
         grad = (J.T * devs).sum(axis=1) / sig2 
 
         # Evaluate and invert the Hessian
-        H_inv = invert_hessian(J.T@J/sig2, ridge=ridge)
+        H_inv = invert_hessian(-J.T@J/sig2, ridge=ridge)
 
         # Get the update vector
-        update[:] = H_inv @ grad
+        update[:] = -H_inv @ grad
 
         # Apply the update to parameter estimate 
         pars = pars + damp * update 
         iter_idx += 1
 
     # Estimate the error with the inverse Hessian
-    err = np.sqrt(np.diagonal(H_inv))
+    err = np.sqrt(np.diagonal(-H_inv))
 
     # Evaluate the Hessian determinant, which is 
     # also useful as a metric of error

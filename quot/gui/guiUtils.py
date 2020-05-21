@@ -91,7 +91,7 @@ def coerce_type(arg, type_):
     """
     if type_ is int:
         return int(arg)
-    elif type_ is float:
+    elif type_ is float or type_ is np.float64:
         return float(arg)
     elif type_ is bool:
         return bool(arg)

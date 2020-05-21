@@ -9,6 +9,9 @@ sequentially on the same datasets
 import os 
 from glob import glob 
 
+# Progress bar
+from tqdm import tqdm 
+
 # Dataframes
 import pandas as pd 
 
@@ -26,8 +29,51 @@ from .track import track
 
 def localize_file(path, out_csv=None, **kwargs):
     """
+    Run filtering, detection, and subpixel localization on 
+    a single image movie. This does NOT perform tracking.
+
+    args
+    ----
+        path        :   str, path to the image file
+        out_csv     :   str, path to save file, if 
+                        desired
+        kwargs      :   configuration
+
+    returns
+    -------
+        pandas.DataFrame, the localizations
+
+    """
+    # Make sure the file exists
+    assert os.path.isfile(path), "quot.__main__.localize_file: " \
+        "file %s does not exist" % path 
+
+    # Open an image file reader with some filtering
+    # settings, if desired
+    with ChunkFilter(path, **kwargs['filter']) as f:
+
+        locs = []
+        for frame_idx, frame in tqdm(enumerate(f)):
+
+            # Find spots in this image frame
+            detections = detect(frame, **kwargs['detect'])
+
+            # Localize spots to subpixel resolution
+            locs.append(localize_frame(frame, detections, 
+                **kwargs['localize']).assign(frame=frame_idx))
+
+        locs = pd.concat(locs, ignore_index=True, sort=False)
+
+    # Save to a file, if desired
+    if not out_csv is None:
+        locs.to_csv(out_csv, index=False)
+
+    return locs 
+
+def track_file(path, out_csv=None, **kwargs):
+    """
     Run filtering, detection, subpixel localization, and 
-    tracking on a single image movie.
+    tracking on a single target movie.
 
     args
     ----
@@ -41,37 +87,20 @@ def localize_file(path, out_csv=None, **kwargs):
         pandas.DataFrame, the localizations indexed by 
             trajectory
 
-    """
-    # Make sure the file exists
-    assert os.path.isfile(path), "quot.__main__.localize_file: " \
-        "file %s does not exist" % path 
-
-    # Open an image file reader with some filtering
-    # settings, if desired
-    with ChunkFilter(path, **kwargs['filter']) as f:
-
-        locs = []
-        for frame_idx, frame in enumerate(f):
-
-            # Find spots in this image frame
-            detections = detect(frame, **kwargs['detect'])
-
-            # Localize spots to subpixel resolution
-            locs.append(localize(frame, detections, 
-                **kwargs['localize']).assign(frame=frame_idx))
-
-        locs = pd.concat(locs, ignore_index=True, sort=False)
+    """ 
+    # Run filtering + detection + localization
+    locs = loc_file(path, out_csv=None, **kwargs)
 
     # Track localizations between frames
     locs = track(locs, **kwargs['track'])
 
-    # Save to a file, if desired
+    # Save to a file if desired 
     if not out_csv is None:
         locs.to_csv(out_csv, index=False)
 
     return locs 
 
-def localize_directory(path, ext='.nd2', verbose=True, 
+def track_directory(path, ext='.nd2', verbose=True, 
     **kwargs):
     """
     Find all image files in a directory and run 
@@ -103,7 +132,7 @@ def localize_directory(path, ext='.nd2', verbose=True,
 
     # Run pipeline on each file
     for path, out_csv in zip(image_paths, out_csvs):
-        trajs = localize_file(path, out_csv=out_csv, **kwargs)
+        trajs = track_file(path, out_csv=out_csv, **kwargs)
         if verbose: print("Finished with file %s..." % path)
 
 

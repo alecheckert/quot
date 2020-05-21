@@ -6,6 +6,9 @@ subpixel.py -- localize PSFs to subpixel resolution
 # Numeric
 import numpy as np 
 
+# Dataframes
+import pandas as pd 
+
 # Image processing 
 from scipy import ndimage as ndi 
 
@@ -412,22 +415,32 @@ def localize_frame(img, positions, method=None, window_size=9,
 
     # Remove detections too close to the edge for a square
     # subwindow
-    hw = window_size // 2
-    positions = positions[
-        (positions[:,0]>=hw) & (positions[:,0]<img.shape[0]-hw) & \
-        (positions[:,1]>=hw) & (positions[:,1]<img.shape[1]-hw)
-    , :]
+    if len(positions.shape)==2:
+        hw = window_size // 2
+        positions = positions[
+            (positions[:,0]>=hw) & (positions[:,0]<img.shape[0]-hw) & \
+            (positions[:,1]>=hw) & (positions[:,1]<img.shape[1]-hw)
+        , :]
 
-    # Get the localization method
-    method_f = METHODS.get(method)
+        # Get the localization method
+        method_f = METHODS.get(method)
 
-    # Localize a PSF in a subwindow of the image
-    def localize_subwindow(yd, xd):
-        return method_f(
-            img[yd-hw:yd+hw+1, xd-hw:xd+hw+1],
-            **method_kwargs
-        ).update({'y_detect': yd, 'x_detect': xd})
+        # Localize a PSF in a subwindow of the image
+        def localize_subwindow(yd, xd):
+            r = method_f(
+                img[yd-hw:yd+hw+1, xd-hw:xd+hw+1],
+                **method_kwargs
+            )
+            r.update({"y_detect": yd, "x_detect": xd})
+            r['y'] = r['y'] + yd - hw 
+            r['x'] = r['x'] + xd - hw 
+            return r
 
-    return pd.DataFrame([localize_subwindow(yd, xd) \
-        for yd, xd in positions])
+        # Run localization on all PSF subwindows
+        result = pd.DataFrame([localize_subwindow(yd, xd) \
+            for yd, xd in positions])
+        return result 
+
+    else:
+        return pd.DataFrame([])
 
