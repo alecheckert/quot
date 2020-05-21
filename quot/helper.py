@@ -1148,4 +1148,145 @@ def fit_poisson_int_gaussian(img, guess, sigma=1.0, ridge=0.0001,
     # also useful as a metric of error
     return pars, err, np.linalg.det(H_inv), rmse, iter_idx
 
+########################
+## TRACKING UTILITIES ##
+########################
+
+def connected_components(semigraph):
+    """
+    Find independent connected subgraphs in a bipartite graph 
+    (aka semigraph) by a floodfill procedure.
+
+    The semigraph is a set of edges betwen two sets of nodes-
+    one set corresponding to each y-index, and the other 
+    corresponding to each x-index. Edges can only exist between
+    a y-node and an x-node, so the semigraph is conveniently
+    represented as a binary (0/1 values) 2D matrix.
+
+    The goal of this function is to identify independent 
+    subgraphs in the original semigraph. If I start on a y-node
+    or x-node for one of these independent subgraphs and walk
+    along edges, I can reach any point in that subgraph but no
+    points in other subgraphs.
+
+    Each subgraph can itself be represented by a 2D ndarray 
+    along with a reference to the specific y-nodes and x-dnoes
+    in the original semigraph corresponding to that subgraph.
+
+    For the purposes of tracking, it is also convenient to 
+    separate y-nodes and x-nodes that are NOT connected by any
+    edges to other nodes. These are returned as separate ndarrays:
+    y_without_x and x_without_y.
+    
+    Parameters
+    ----------
+        semigraph       :   2D ndarray, with only 0 and 1 values
+    
+    Returns
+    -------
+    (
+        subgraphs           :   list of 2D ndarray
+        subgraph_y_indices  :   list of 1D ndarray, the set of 
+                                y-nodes corresponding to each 
+                                subgraph
+        subgraph_x_indices  :   list of 1D ndarray, the set of 
+                                x-nodes corresponding to each 
+                                subgraph
+        y_without_x         :   1D ndarray, the y-nodes that are 
+                                not connected to any x-nodes
+        x_without_y         :   1D ndarray, the x-nodes that are 
+                                not connected to any y-nodes
+    )
+
+    """
+    # The set of all y-nodes (corresponding to y-indices in the semigraph)
+    y_indices = np.arange(semigraph.shape[0]).astype("int64")
+
+    # The set of all x-nodes (corresponding to x-indices in the semigraph)
+    x_indices = np.arange(semigraph.shape[1]).astype("int64")
+
+    # Find y-nodes that don't connect to any x-node,
+    # and vice versa
+    where_y_without_x = semigraph.sum(axis=1) == 0
+    where_x_without_y = semigraph.sum(axis=0) == 0
+    y_without_x = y_indices[where_y_without_x]
+    x_without_y = x_indices[where_x_without_y]
+
+    # Consider the remaining nodes, which have at least one edge
+    # to a node of the other class
+    semigraph = semigraph[~where_y_without_x, :]
+    semigraph = semigraph[:, ~where_x_without_y]
+    y_indices = y_indices[~where_y_without_x]
+    x_indices = x_indices[~where_x_without_y]
+
+    # For the remaining nodes, keep track of (1) the subgraphs
+    # encoding connected components, (2) the set of original y-indices
+    # corresponding to each subgraph, and (3) the set of original x-
+    # indices corresponding to each subgraph
+    subgraphs = []
+    subgraph_y_indices = []
+    subgraph_x_indices = []
+
+    # Work by iteratively removing independent subgraphs from the
+    # graph. The list of nodes still remaining are kept in
+    # *unassigned_y* and *unassigned_x*
+    unassigned_y, unassigned_x = (semigraph == 1).nonzero()
+
+    # The current index is used to floodfill the graph with that
+    # integer. It is incremented as we find more independent subgraphs.
+    current_idx = 2
+
+    # While we still have unassigned nodes
+    while len(unassigned_y) > 0:
+
+        # Start the floodfill somewhere with an unassigned y-node
+        semigraph[unassigned_y[0], unassigned_x[0]] = current_idx
+
+        # Keep going until subsequent steps of the floodfill don't
+        # pick up additional nodes
+        prev_nodes = 0
+        curr_nodes = 1
+        while curr_nodes != prev_nodes:
+            # Only floodfill along existing edges in the graph
+            where_y, where_x = (semigraph == current_idx).nonzero()
+
+            # Assign connected nodes to the same subgraph index
+            semigraph[where_y, :] *= current_idx
+            semigraph[semigraph > current_idx] = current_idx
+            semigraph[:, where_x] *= current_idx
+            semigraph[semigraph > current_idx] = current_idx
+
+            # Correct for re-finding the same nodes and multiplying
+            # them more than once (implemented in the line above)
+            # semigraph[semigraph > current_idx] = current_idx
+
+            # Update the node counts in this subgraph
+            prev_nodes = curr_nodes
+            curr_nodes = (semigraph == current_idx).sum()
+        current_idx += 1
+
+        # Get the local indices of the y-nodes and x-nodes (in the context
+        # of the remaining graph)
+        where_y = np.unique(where_y)
+        where_x = np.unique(where_x)
+
+        # Use the local indices to pull this subgraph out of the
+        # main graph
+        subgraph = semigraph[where_y, :]
+        subgraph = subgraph[:, where_x]
+
+        # Save the subgraph
+        if not (subgraph.shape[0] == 0 and subgraph.shape[0] == 0):
+            subgraphs.append(subgraph)
+
+            # Get the original y-nodes and x-nodes that were used in this
+            # subgraph
+            subgraph_y_indices.append(y_indices[where_y])
+            subgraph_x_indices.append(x_indices[where_x])
+
+        # Update the list of unassigned y- and x-nodes
+        unassigned_y, unassigned_x = (semigraph == 1).nonzero()
+
+    return subgraphs, subgraph_y_indices, subgraph_x_indices, y_without_x, x_without_y
+
 
