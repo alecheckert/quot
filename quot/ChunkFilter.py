@@ -113,6 +113,9 @@ class ChunkFilter(ImageReader):
         self._offset = self.start % self.chunk_size
         self.chunk_starts[1:] = np.arange(n_chunks)*self.chunk_size+self._offset
 
+        # Special case: last chunk 
+        self.chunk_starts[-1] = self.n_frames - self.chunk_size
+
     def _in_chunk(self, frame_index):
         """
         Return True if the frame is in the current chunk.

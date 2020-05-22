@@ -64,6 +64,7 @@ def detect(path, **kwargs):
 @cli.command()
 @click.argument("image_path", type=str)
 @click.argument("locs_path", type=str)
+@click.option('-f0', '--start_frame', type=int, default=0, help='default 0')
 @click.option('-s', '--gui_size', type=int, default=800, help='default 800')
 def spot_viewer(image_path, locs_path, **kwargs):
     """

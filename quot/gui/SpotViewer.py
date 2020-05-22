@@ -33,18 +33,23 @@ from PySide2.QtWidgets import QWidget, QLabel, QPushButton, \
     QVBoxLayout, QGridLayout, QApplication, QDialog
 
 # pyqtgraph utilities for images and overlays
-from pyqtgraph import ImageView, ScatterPlotItem, GraphItem 
+from pyqtgraph import ImageView, ScatterPlotItem, GraphItem, \
+    PlotWidget, LinearRegionItem
 from pyqtgraph.graphicsItems import ScatterPlotItem as SPI_base
 
 # Custom GUI utilities
 from .guiUtils import FloatSlider, IntSlider, LabeledQComboBox, \
     set_dark_app, Symbols, keys_to_str, MASTER_COLOR, \
-    SingleComboBoxDialog
+    SingleComboBoxDialog, ImageSubpositionWindow, \
+    ImageSubpositionCompare
 
 # Default parameters for spot overlays
 pen_width = 3
 overlay_params = {'pxMode': False, 'brush': None,
     'pen': {'color': MASTER_COLOR, 'width': pen_width}}
+
+# Colors for conditions
+condition_colors = ['#FF5454', '#2DA8FF']
 
 # Custom overlay symbols a little
 SPI_base.Symbols['+'] = Symbols['alt +']
@@ -52,11 +57,13 @@ SPI_base.Symbols['open +'] = Symbols['open +']
 symbol_sizes = {'+': 16.0, 'o': 16.0, 'open +': 16.0}
 
 class SpotViewer(QWidget):
-    def __init__(self, image_path, locs_path, gui_size=800, parent=None):
+    def __init__(self, image_path, locs_path, gui_size=800,
+        start_frame=0, parent=None):
         super(SpotViewer, self).__init__(parent=parent)
         self.image_path = image_path 
         self.locs_path = locs_path
         self.gui_size = gui_size 
+        self.start_frame = start_frame
 
         self.initData()
         self.initUI()
@@ -101,14 +108,17 @@ class SpotViewer(QWidget):
         # Generate the set of colors
         self.generate_color_schemes()
 
+        # Assign condition colors (initially all negative)
+        self.assign_condition_colors('y')
+
         # Load the first round of spots
-        self.load_image(0)
+        self.load_image(self.start_frame)
 
         # Assign each trajectory a color
         self.assign_traj_colors()
 
         # Assign self.locs_curr, the current set of spots
-        self.load_spots(0)
+        self.load_spots(self.start_frame)
 
     def initUI(self):
         """
@@ -156,8 +166,9 @@ class SpotViewer(QWidget):
 
         # Frame slider
         self.frame_slider = IntSlider(minimum=0, interval=1, 
-            maximum=self.imageReader.n_frames-1, init_value=0,
+            maximum=self.imageReader.n_frames-1, init_value=self.start_frame,
             name='Frame', parent=self.win_left)
+        #self.frame_slider.configure(init_value=self.start_frame)
         L_left.addWidget(self.frame_slider, 0, 0, rowSpan=2, 
             alignment=widget_align)
         self.frame_slider.assign_callback(self.frame_slider_callback)
@@ -170,9 +181,9 @@ class SpotViewer(QWidget):
 
         # Button to toggle trajectory trails
         self.B_overlay_trails_state = False 
-        self.B_overlay_trails = QPushButton("Show history", parent=self.win_left)
+        self.B_overlay_trails = QPushButton("Overlay histories", parent=self.win_left)
         self.B_overlay_trails.clicked.connect(self.B_overlay_trails_callback)
-        L_left.addWidget(self.B_overlay_trails, 2, 0, alignment=widget_align)
+        L_left.addWidget(self.B_overlay_trails, 1, 1, alignment=widget_align)
         self.B_overlay_trails.stackUnder(self.B_overlay)
 
         # Menu to select current overlay symbol
@@ -180,23 +191,36 @@ class SpotViewer(QWidget):
         self.M_symbol = LabeledQComboBox(symbol_options, "Overlay symbol",
             init_value="o", parent=self.win_left)
         self.M_symbol.assign_callback(self.M_symbol_callback)
-        L_left.addWidget(self.M_symbol, 3, 0, alignment=widget_align)
+        L_left.addWidget(self.M_symbol, 2, 0, alignment=widget_align)
 
         # Menu to select how the spots are colored
-        color_by_options = ["None", "trajectory", "attribute"]
+        color_by_options = ["None", "Trajectory", "Attribute", "Binary condition"]
         self.M_color_by = LabeledQComboBox(color_by_options, 
             "Color spots by", init_value="None", parent=self.win_left)
         self.M_color_by.assign_callback(self.M_color_by_callback)
-        L_left.addWidget(self.M_color_by, 4, 0, alignment=widget_align)
+        L_left.addWidget(self.M_color_by, 3, 0, alignment=widget_align)
 
         # Create a new binary spot condition
-        self.B_create_condition = QPushButton("Create new condition", 
+        self.B_create_condition = QPushButton("Create binary condition", 
             parent=self.win_left)
         self.B_create_condition.clicked.connect(self.B_create_condition_callback)
-        L_left.addWidget(self.B_create_condition, 5, 0, alignment=widget_align)
+        L_left.addWidget(self.B_create_condition, 4, 0, alignment=widget_align)
+
+        # Select the binary column that determines color when "condition"
+        # is selected as the color-by attribute
+        condition_options = [c for c in self.locs.columns if self.locs[c].dtype == 'bool']
+        self.M_condition = LabeledQComboBox(condition_options, "Binary condition",
+            init_value="None", parent=self.win_left)
+        L_left.addWidget(self.M_condition, 3, 1, alignment=widget_align)
+        self.M_condition.assign_callback(self.M_condition_callback)
+
+        # Compare spots in a separate window that shows a grid of spots
+        self.B_compare_spots = QPushButton("Compare spots", parent=self)
+        L_left.addWidget(self.B_compare_spots, 2, 1, alignment=widget_align)
+        self.B_compare_spots.clicked.connect(self.B_compare_spot_callback)
 
         # Some placeholder widgets, for better formatting
-        for j in range(6, 15):
+        for j in range(6, 18):
             q = QLabel(parent=self.win_left)
             L_left.addWidget(q, j, 0, alignment=widget_align)
 
@@ -219,11 +243,14 @@ class SpotViewer(QWidget):
         self.imageView.setImage(self.image, autoRange=autoRange, 
             autoLevels=autoLevels, autoHistogramRange=autoHistogramRange)
 
-    def load_spots(self, frame_index):
+    def load_spots(self, frame_index=None):
         """
         Load a new set of localizations.
 
         """
+        if frame_index is None:
+            frame_index = self.frame_slider.value()
+
         self.locs_curr = self.locs.loc[self.locs['frame']==frame_index, :]
         self.locs_pos = np.asarray(self.locs_curr[['y', 'x']])
         self.locs_data = self.locs_curr.to_dict(orient='records')
@@ -277,18 +304,21 @@ class SpotViewer(QWidget):
                 self.scatterPlotItem.setData(pos=self.locs_pos+0.5,
                     data=self.locs_data, symbol=symbol, 
                     size=symbol_sizes[symbol], **overlay_params)
-            elif color_by == "trajectory":
+            elif color_by == "Trajectory":
                 self.scatterPlotItem.setData(
                     spots=self.generate_color_spot_dict("traj_color"),
                     data=self.locs_data
                 )
-            elif color_by == "attribute": 
+            elif color_by == "Attribute": 
                 self.scatterPlotItem.setData(
                     spots=self.generate_color_spot_dict("attrib_color"),
                     data=self.locs_data,
                 )
-            elif color_by == "condition":
-                pass 
+            elif color_by == "Binary condition":
+                self.scatterPlotItem.setData(
+                    spots=self.generate_color_spot_dict("condition_color"),
+                    data=self.locs_data,
+                )
         else:
             self.scatterPlotItem.setData([])
 
@@ -362,6 +392,17 @@ class SpotViewer(QWidget):
 
         # Unsanitary inputs are colored white
         self.locs.loc[~sanitary, "attrib_color"] = "#FFFFFF"
+
+    def assign_condition_colors(self, condition_col):
+        """
+        Assign the "condition_color" of the dataframe which is 
+        keyed to the truth value of *condition_col*.
+
+        """
+        indices = self.locs[condition_col].astype('int64')
+        self.locs["condition_color"] = condition_colors[0]
+        self.locs.loc[self.locs[condition_col].astype('bool'), 
+            "condition_color"] = condition_colors[1]
 
     def overlay_trails(self):
         """
@@ -437,7 +478,7 @@ class SpotViewer(QWidget):
 
         """
         color_by = self.M_color_by.currentText()
-        if color_by == "attribute":
+        if color_by == "Attribute":
 
             # Prompt the user to select an attribute to color by
             options = [c for c in self.locs.columns if \
@@ -445,9 +486,15 @@ class SpotViewer(QWidget):
             ex = SingleComboBoxDialog("Attribute", options, 
                 init_value="I0", title="Choose attribute color by",
                 parent=self)
-            if ex.exec_() is QDialog.Accepted:
+            ex.exec_()
+
+            # Dialog accepted
+            if ex.result() == 1:
                 attrib = ex.return_val 
+
+            # Dialog rejected; default to I0
             else:
+                print("rejected; defaulting to I0")
                 attrib = "I0"
 
             # Generate the color indices
@@ -455,6 +502,13 @@ class SpotViewer(QWidget):
 
             # Update the current set of localizations
             self.load_spots(self.frame_slider.value())
+
+        elif color_by == "Binary condition":
+            self.assign_attribute_colors(self.M_condition.currentText())
+            self.overlay_spots()
+
+        else:
+            pass 
 
         # Update the scatter plot
         self.overlay_spots()
@@ -486,19 +540,250 @@ class SpotViewer(QWidget):
         one of the spot attributes.
 
         """
-        pass 
+        # Prompt the user to create a condition
+        ex = ConditionDialog(self.locs, parent=self)
+        ex.exec()
+
+        # Accepted - unpack result
+        if ex.result() == 1:
+            bounds, col = ex.return_val
+            l_bound, u_bound = bounds 
+
+            # Add this as an option 
+            condition_name = '%s_condition' % col 
+            if condition_name not in self.locs.columns:
+                self.M_condition.QComboBox.addItems([condition_name])
+
+            # Create a new binary column on the dataframe
+            self.locs[condition_name] = np.logical_and(
+                self.locs[col]>=l_bound,
+                self.locs[col]<=u_bound,
+            )
+            print("%d/%d localizations in condition %s" % (
+                self.locs[condition_name].sum(),
+                len(self.locs),
+                condition_name
+            ))
+
+            # Update plots, assuming that the user wants to see the 
+            # result immediately
+            self.M_condition.QComboBox.setCurrentText(condition_name)
+            self.M_color_by.QComboBox.setCurrentText("Binary condition")
+            self.assign_condition_colors(condition_name)
+            self.load_spots()
+            self.overlay_spots()
+
+    def M_condition_callback(self):
+        """
+        Select the current binary condition to use for determining
+        color when using the "Binary condition" option in M_color_by.
+
+        """
+        # Get the new condition name
+        c = self.M_condition.currentText()
+
+        # Assign each localization a color depending on its value
+        # with this value
+        self.assign_condition_colors(c)
+
+        # Update the plots
+        self.load_spots()
+        self.overlay_spots()
+
+    def B_compare_spot_callback(self):
+        """
+        Launch a subwindow that shows a grid of spots in the current
+        frame and subsequent frames.
+
+        This callback has two behaviors, depending on the current 
+        state of self.M_color_by. If we're color by a binary condition,
+        then launch a ImageSubpositionCompare window. Else launch a 
+        ImageSubpositionWindow. The former compares two sets of spots
+        side-by-side, while the second is just a single grid of spots.
+
+        """
+        if self.M_color_by.currentText() == "Binary condition":
+
+            # Size of image grid
+            N = 8
+
+            # Get the current binary condition column
+            col = self.M_condition.currentText()
+
+            # Get as many spots as we can to fill this image grid
+            frame_index = self.frame_slider.value()
+            positions_false = []
+            positions_true = []
+            images = []
+            while frame_index<self.imageReader.n_frames and \
+                (sum([i.shape[0] for i in positions_false])<N**2 or 
+                    (sum([i.shape[0] for i in positions_true])<N**2)):
+
+                im = self.imageReader.get_frame(frame_index)
+                frame_locs = self.locs.loc[
+                    self.locs['frame']==frame_index,
+                    ['y', 'x', col],
+                ]
+                frame_locs_true = np.asarray(frame_locs.loc[
+                    frame_locs[col], ['y', 'x']]).astype(np.int64)
+                frame_locs_false = np.asarray(frame_locs.loc[
+                    ~frame_locs[col], ['y', 'x']]).astype(np.int64)
+                images.append(im)
+                positions_true.append(frame_locs_true)
+                positions_false.append(frame_locs_false)
+
+                frame_index += 1
+
+            # Launch a ImageSubpositionCompare instance
+            ex = ImageSubpositionCompare(images, positions_true, positions_false, 
+                w=15, N=N, colors=condition_colors, parent=self)
+
+        else:
+            # Size of image grid
+            N = 10
+
+            # Get as many spots as we can to fill this image grid
+            frame_index = self.frame_slider.value()
+            positions = []
+            images = []
+            while sum([i.shape[0] for i in positions])<N**2 and \
+                frame_index<self.imageReader.n_frames:
+
+                im = self.imageReader.get_frame(frame_index)
+                frame_locs = np.asarray(self.locs.loc[
+                    self.locs['frame']==frame_index, ['y', 'x']]).astype(np.int64)
+                images.append(im)
+                positions.append(frame_locs)
+                frame_index += 1
+
+            # Launch an ImageSubpositionWindow
+            ex = ImageSubpositionWindow(images, positions,
+                w=15, N=N, parent=self)
+
+class ConditionDialog(QDialog):
+    """
+    Create a new binary column on a set of localizations by 
+    drawing a threshold on a 1D histogram of some attribute 
+    for those localizations.
+
+    For example, threshold only spots with low intensity (I0)
+    or something.
+
+    init
+    ----
+        locs        :   pandas.DataFrame
+        parent      :   root QWidget
+
+    """
+    def __init__(self, locs, parent=None):
+        super(ConditionDialog, self).__init__(parent=parent)
+        self.locs = locs 
+        self.initUI()
+
+    def initUI(self):
+        """
+        Initialize user interface.
+
+        """
+        L = QGridLayout(self)
+        self.resize(500, 300)
+
+        widget_align = Qt.AlignLeft
+
+        # Available columns for recondition: all numeric columns
+        self.columns = list(filter(
+            lambda c: self.locs[c].dtype in ['float64', 'float32', \
+                'uint8', 'uint16', 'int64'],
+            self.locs.columns))
+
+        # For the default, choose `I0` if available; otherwise
+        # choose the first column
+        init_col = 'I0' if ('I0' in self.columns) else self.columns[0]
+        self.load_col(init_col)
+
+        # Main plot
+        self.PlotWidget = PlotWidget(name="Create binary condition")
+        L.addWidget(self.PlotWidget, 0, 0, alignment=widget_align)
+
+        # Histogram
+        self.curve = self.PlotWidget.plot(self.bin_c, self.H, clickable=True)
+
+        # User threshold, as a LinearRegionItem from pyqtgraph
+        self.LinearRegion = LinearRegionItem([self.hmin, (self.hmax-self.hmin)*0.25+self.hmin])
+        self.PlotWidget.addItem(self.LinearRegion)
+
+        # Drop-down menu to select the column
+        self.M_select_col = LabeledQComboBox(self.columns, "Attribute",
+            init_value=init_col, parent=self)
+        self.M_select_col.assign_callback(self.M_select_col_callback)
+        L.addWidget(self.M_select_col, 1, 0, alignment=widget_align)
+
+        # Accept the current threshold
+        self.B_accept = QPushButton("Accept", parent=self)
+        L.addWidget(self.B_accept, 2, 0, alignment=widget_align)
+        self.B_accept.clicked.connect(self.B_accept_callback)
+
+        self.update_histogram()
+
+    def load_col(self, col):
+        """
+        Get data from a specific column in the locs dataframe.
+
+        args
+        ----
+            col     :   str
+
+        """
+        self.data = np.asarray(self.locs[col])
+
+        # Histogram limits
+        self.hmin = self.data.min()
+        self.hmax = np.percentile(self.data, 99.9)
+
+        # Binning scheme
+        n_bins = 100
+        bin_size = (self.hmax - self.hmin) / n_bins
+        self.bin_edges = np.arange(self.hmin, self.hmax, bin_size)
+
+        # Bin the data according to the binning scheme
+        self.H, _edges = np.histogram(self.data, bins=self.bin_edges)
+        self.bin_c = self.bin_edges[:-1] + (self.bin_edges[1]-self.bin_edges[0])/2.0
+
+    def update_histogram(self):
+        """
+        Update the main histogram with data from a new column
+
+        """
+        self.PlotWidget.clear()
+        self.curve = self.PlotWidget.plot(self.bin_c, self.H)
+        self.curve.setPen('w')
+
+        # Set default values for linear rect region
+        self.LinearRegion.setRegion((self.hmin, np.percentile(self.data, 50)))
+        self.PlotWidget.addItem(self.LinearRegion)
+        self.curve.updateItems()
+
+    def M_select_col_callback(self):
+        """
+        Select the current attribute to filter on.
+
+        """
+        col = self.M_select_col.currentText()
+        self.load_col(col)
+        self.update_histogram()
+
+    def B_accept_callback(self):
+        """
+        Set the return value and exit from the dialog.
+
+        """
+        self.return_val = (
+            self.LinearRegion.getRegion(),
+            self.M_select_col.currentText(),
+        )
+        self.accept()
 
 
-
-if __name__ == '__main__':
-    app = QApplication([])
-    set_dark_app(app)
-    x = SpotViewer(
-        '78203_BioPipeline_Run1_20200508_222010_652__Plate000_WellB19_ChannelP95_Seq0035.nd2',
-        '78203_BioPipeline_Run1_20200508_222010_652__Plate000_WellB19_ChannelP95_Seq0035_tracks.csv',
-        #'test_without_traj.csv',
-    )
-    sys.exit(app.exec_())
 
 
 

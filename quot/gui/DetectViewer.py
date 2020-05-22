@@ -654,7 +654,7 @@ class DetectViewer(QWidget):
 
         # Get as many spots as 
         ex = ImageSubpositionWindow(images, 
-            positions, w=15, N=9, parent=self)
+            positions, w=15, N=N, parent=self)
 
 
 

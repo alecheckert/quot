@@ -64,6 +64,9 @@ def localize_file(path, out_csv=None, **kwargs):
 
         locs = pd.concat(locs, ignore_index=True, sort=False)
 
+        # Adjust for start index
+        locs['frame'] += kwargs['filter'].get('start', 0)
+
     # Save to a file, if desired
     if not out_csv is None:
         locs.to_csv(out_csv, index=False)

@@ -342,6 +342,227 @@ class ImageSubpositionWindow(QWidget):
         print("Uniform LUTs: ", self.B_uniform_state)
         self.rescale_luts()
 
+class ImageSubpositionCompare(QWidget):
+    """
+    Compare two sets of spots defined as subwindows in a larger
+    image.
+
+    A grid on the left shows spots in one category, while a grid
+    of subwindows on the right show the spots in the other.
+
+    init
+    ----
+        image       :   2D ndarray (YX) or list of 2D ndarray (YX)
+
+    """
+    def __init__(self, image, positions_false, positions_true, w=9,
+        N=5, colors=['#FF5454', '#2DA8FF'], title=None, parent=None):
+
+        # Init
+        super(ImageSubpositionCompare, self).__init__(parent=parent)
+        self.image = image 
+        self.positions_false = positions_false
+        self.positions_true = positions_true 
+        self.w = w 
+        self.N = N 
+        self.colors = colors 
+        self.title = title 
+        self.initUI()
+
+    def initUI(self):
+        """
+        Initialize the user interface.
+
+        """
+        # Main window
+        self.win = QWidget()
+        L = QGridLayout(self.win)
+
+        # Left image grid
+        self.graphics_view_left = GraphicsView()
+        L.addWidget(self.graphics_view_left, 0, 0)
+        self.graphics_layout_left = GraphicsLayout()
+        self.graphics_view_left.setCentralItem(self.graphics_layout_left)
+        self.graphics_view_left.show()
+
+        # Right image grid
+        self.graphics_view_right = GraphicsView()
+        L.addWidget(self.graphics_view_right, 0, 1)
+        self.graphics_layout_right = GraphicsLayout()
+        self.graphics_view_right.setCentralItem(self.graphics_layout_right)
+        self.graphics_view_right.show()
+
+        # A grid of ImageItem objects to hold each subwindow
+        self.ImageItemsLeft = []
+        for j in range(self.N**2):
+            II = ImageItem()
+            self.ImageItemsLeft.append(II)
+
+        for j in range(self.N**2):
+            if j % self.N == 0:
+                self.graphics_layout_left.nextRow()
+            vb = self.graphics_layout_left.addViewBox(lockAspect=True,
+                border={'color': self.colors[0], 'width': 0.25})
+            vb.addItem(self.ImageItemsLeft[j])
+
+        self.ImageItemsRight = []
+        for j in range(self.N**2):
+            II = ImageItem()
+            self.ImageItemsRight.append(II)
+
+        for j in range(self.N**2):
+            if j % self.N == 0:
+                self.graphics_layout_right.nextRow()
+            vb = self.graphics_layout_right.addViewBox(lockAspect=True,
+                border={'color': self.colors[1], 'width': 0.25})
+            vb.addItem(self.ImageItemsRight[j])
+
+        # Lower window, for widgets
+        self.lower_win = QWidget(self.win)
+        L_lower = QGridLayout(self.lower_win)
+        L.addWidget(self.lower_win, 1, 0, alignment=Qt.AlignLeft)
+
+        # Menu to select window size
+        w_options = [str(j*2+1) for j in range(1, 11)]
+        self.M_w = LabeledQComboBox(w_options, "Window size", init_value="13",
+            parent=self.lower_win)
+        L_lower.addWidget(self.M_w, 0, 0, alignment=Qt.AlignTop)
+        self.M_w.assign_callback(self.M_w_callback)
+
+        # Rescale LUTs uniformly
+        self.B_uniform_state = False 
+        self.B_uniform = QPushButton("Uniform LUTs", parent=self.lower_win)
+        L_lower.addWidget(self.B_uniform, 1, 0, alignment=Qt.AlignTop)
+        self.B_uniform.clicked.connect(self.B_uniform_callback)
+
+        # Load the current set of windows
+        self.get_images()
+
+        # Resize the GUI
+        self.win.resize(800, 500)
+
+        # Show the main window
+        self.win.show()
+
+    def get_subwindow(self, image, yx, w):
+        """
+        Grab one image subwindow.
+
+        """
+        hw = w//2
+        y, x = yx 
+        y0 = max(0, y-hw)
+        x0 = max(0, x-hw)
+        y1 = min(y+hw+1, image.shape[0])
+        x1 = min(x+hw+1, image.shape[1])
+        return image[y0:y1, x0:x1]
+
+    def rescale_luts(self):
+        """
+        Scale the LUTs of each subimage to have black/white
+        levels set either by the global min/max of all the 
+        subwindows, or the local min/max of that specific
+        subimage, depending on self.B_overlay_state. 
+
+        """
+        if self.B_uniform_state:
+            global_min = min([s.min() for s in self.subwindows_true + self.subwindows_false])
+            global_max = max([s.max() for s in self.subwindows_true + self.subwindows_false])
+            for j in range(len(self.ImageItemsLeft)):
+                self.ImageItemsLeft[j].setLevels((global_min, global_max))
+            for j in range(len(self.ImageItemsRight)):
+                self.ImageItemsRight[j].setLevels((global_min, global_max))               
+        else:
+            for j in range(len(self.subwindows_true)):
+                self.ImageItemsLeft[j].setLevels((
+                    self.subwindows_true[j].min(),
+                    self.subwindows_true[j].max()
+                ))
+            for j in range(len(self.subwindows_false)):
+                self.ImageItemsRight[j].setLevels((
+                    self.subwindows_false[j].min(),
+                    self.subwindows_false[j].max()
+                ))
+
+    def get_images(self):
+        """
+        Extract subimages from the current set of positions.
+
+        """
+        self.subwindows_true = []
+        self.subwindows_false = []
+        if isinstance(self.positions_true, np.ndarray):
+
+            # Left image grid
+            n_pos = min(self.positions_true.shape[0], self.N**2)
+            for i in range(n_pos):
+                subimage = self.get_subwindow(self.image,
+                    self.positions_true[i,:], self.w)
+                self.subwindows_true.append(subimage)
+                self.ImageItemsLeft[i].setImage(subimage)
+                self.ImageItemsLeft[i].show()
+            for i in range(n_pos, self.N**2):
+                self.ImageItemsLeft[i].hide()
+
+            # Right image grid
+            n_pos = min(self.positions_false.shape[0], self.N**2)
+            for i in range(n_pos):
+                subimage = self.get_subwindow(self.image,
+                    self.positions_false[i,:], self.w)
+                self.subwindows_false.append(subimage)
+                self.ImageItemsRight[i].setImage(subimage)
+                self.ImageItemsRight[i].show()
+            for i in range(n_pos, self.N**2):
+                self.ImageItemsRight[i].hide()
+
+
+        elif isinstance(self.positions_true, list):
+
+            # Left image grid
+            for i, im in enumerate(self.image):
+                for j in range(self.positions_true[i].shape[0]):
+                    self.subwindows_true.append(self.get_subwindow(
+                        im, self.positions_true[i][j,:], self.w))
+            if len(self.subwindows_true) > self.N**2:
+                self.subwindows_true = self.subwindows_true[:self.N**2]
+            for j in range(len(self.subwindows_true)):
+                self.ImageItemsLeft[j].setImage(self.subwindows_true[j])
+                self.ImageItemsLeft[j].show()
+            for j in range(len(self.subwindows_true), self.N**2):
+                self.ImageItemsLeft[j].hide()
+
+            # Right image grid
+            for i, im in enumerate(self.image):
+                for j in range(self.positions_false[i].shape[0]):
+                    self.subwindows_false.append(self.get_subwindow(
+                        im, self.positions_false[i][j,:], self.w))
+            if len(self.subwindows_false) > self.N**2:
+                self.subwindows_false = self.subwindows_false[:self.N**2]
+            for j in range(len(self.subwindows_false)):
+                self.ImageItemsRight[j].setImage(self.subwindows_false[j])
+                self.ImageItemsRight[j].show()
+            for j in range(len(self.subwindows_false), self.N**2):
+                self.ImageItemsRight[j].hide()
+
+    def M_w_callback(self):
+        """
+        Change the window size.
+
+        """
+        self.w = int(self.M_w.currentText())
+        self.get_images()
+        if self.B_uniform_state:
+            self.rescale_luts()
+
+    def B_uniform_callback(self):
+        """
+        Set a uniform LUT for all subwindows.
+
+        """
+        self.B_uniform_state = not self.B_uniform_state
+        print("Uniform LUTs: ", self.B_uniform_state)
+        self.rescale_luts()
+
 class LabeledQComboBox(QWidget):
     """
     A QComboBox with a QLabel above it. Useful to indicate
@@ -420,6 +641,7 @@ class IntSlider(QWidget):
         self.maximum = int(maximum)
         self.interval = int(interval)
         self.min_width = min_width 
+        self.init_value = int(init_value)
         if name is None:
             name = ''
         self.name = name 
@@ -480,6 +702,10 @@ class IntSlider(QWidget):
 
         # Set a minimum width for this slider
         self.slider.setMinimumWidth(self.min_width)
+
+        # Set the initial value
+        midx = (np.argmin(np.abs(self.slider_values - self.init_value)))
+        self.slider.setValue(midx)
 
         # Update the current label 
         self._set_label_current()
