@@ -89,7 +89,7 @@ def track_file(path, out_csv=None, **kwargs):
 
     """ 
     # Run filtering + detection + localization
-    locs = loc_file(path, out_csv=None, **kwargs)
+    locs = localize_file(path, out_csv=None, **kwargs)
 
     # Track localizations between frames
     locs = track(locs, **kwargs['track'])

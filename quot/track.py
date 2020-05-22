@@ -351,7 +351,7 @@ def reconnect_conservative(trajs, locs, locs_array, max_blinks=0,
     n_trajs = len(trajs)
     n_locs = locs.shape[0]
     if n_trajs==1 and n_locs==1:
-        trajs[0].add_idx(locs[0,0], (n_trajs,n_locs))
+        trajs[0].add_index(locs[0,0], (n_trajs,n_locs))
         out = trajs 
 
     # Multiple localizations and/or trajectories
@@ -409,7 +409,7 @@ def reconnect_hungarian(trajs, locs, locs_array, max_blinks=0,
 
     # Unambiguous - only one trajectory and localization
     if n_traj==1 and n_locs==1:
-        trajs[0].add_idx(locs[0,0], (n_traj,n_locs))
+        trajs[0].add_index(locs[0,0], (n_traj,n_locs))
 
     # Otherwise, solve the assignment problem by finding 
     # weights and minimizing with the Hungarian algorithm
@@ -425,7 +425,7 @@ def reconnect_hungarian(trajs, locs, locs_array, max_blinks=0,
 
             # traj:loc
             if (i<n_traj) and (j<n_locs):
-                trajs[i].add_idx(locs[j,0], (n_traj,n_locs))
+                trajs[i].add_index(locs[j,0], (n_traj,n_locs))
 
             # traj:(empty)
             elif (i<n_traj) and (j>=n_locs):
@@ -482,7 +482,7 @@ def reconnect_diffusion(trajs, locs, locs_array, max_blinks=0,
 
     """
     return reconnect_hungarian(trajs, locs, locs_array, 
-        method='diffusion', max_blinks=0, min_I0=min_I0, **kwargs)
+        weight_method='diffusion', max_blinks=0, min_I0=min_I0, **kwargs)
 
 def reconnect_euclidean(trajs, locs, locs_array, max_blinks=0,
     min_I0=0.0, **kwargs):
@@ -512,7 +512,7 @@ def reconnect_euclidean(trajs, locs, locs_array, max_blinks=0,
 
     """
     return reconnect_hungarian(trajs, locs, locs_array, 
-        method='euclidean', max_blinks=0, min_I0=min_I0, **kwargs)
+        weight_method='euclidean', max_blinks=0, min_I0=min_I0, **kwargs)
 
 ########################################
 ## ALL AVAILABLE RECONNECTION METHODS ##
@@ -530,7 +530,7 @@ METHODS = {
 
 def track(locs, method="diffusion", search_radius=2.5, 
     pixel_size_um=0.16, frame_interval=0.00548, min_I0=0.0,
-    **kwargs):
+    max_blinks=0, debug=False, **kwargs):
     """
     Given a dataframe with localizations, reconnect into 
     trajectories.
@@ -671,7 +671,7 @@ def track(locs, method="diffusion", search_radius=2.5,
 
                 # Only one traj and one loc: assignment is unambiguous
                 if subgraph.shape[0]==1 and subgraph.shape[1]==1:
-                    active[Ti[si][0]].add_idx(frame_locs[Li[si][0], 0], (1,1))
+                    active[Ti[si][0]].add_index(frame_locs[Li[si][0], 0], (1,1))
                     new.append(active[Ti[si][0]])
 
                 # Otherwise, pass to the reconnection method
@@ -713,13 +713,13 @@ def track(locs, method="diffusion", search_radius=2.5,
         subproblem_sizes_locs[np.asarray(t.indices)] = L_size 
 
     # Assign traj index as a column in the original dataframe
-    localizations['trajectory'] = ids 
-    localizations['subproblem_n_traj'] = subproblem_sizes_traj
-    localizations['subproblem_n_locs'] = subproblem_sizes_locs
+    locs['trajectory'] = ids 
+    locs['subproblem_n_traj'] = subproblem_sizes_traj
+    locs['subproblem_n_locs'] = subproblem_sizes_locs
 
     # If desired, return the Trajectory objects for testing
     if debug:
-        return localizations, completed 
+        return locs, completed 
     else:
-        return localizations 
+        return locs 
 

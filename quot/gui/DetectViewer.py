@@ -657,12 +657,5 @@ class DetectViewer(QWidget):
             positions, w=15, N=9, parent=self)
 
 
-if __name__ == '__main__':
-    app = QApplication()
-    set_dark_app(app)
-    ex = DetectViewer('78203_BioPipeline_Run1_20200508_222010_652__Plate000_WellB19_ChannelP95_Seq0035.nd2',
-        start_frame=900, stop_frame=1000, y0=200, y1=500, x0=200, x1=500)
-    sys.exit(app.exec_())
-
 
 

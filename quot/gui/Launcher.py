@@ -18,6 +18,7 @@ from PySide2.QtWidgets import QApplication, QWidget, QLabel, \
 from .guiUtils import set_dark_app, getOpenFilePath
 from .ImageViewer import ImageViewer 
 from .DetectViewer import DetectViewer 
+from .SpotViewer import SpotViewer 
 
 class Launcher(QWidget):
     """
@@ -102,11 +103,51 @@ class Launcher(QWidget):
         # If this is a real file path, launch a DetectViewer 
         # on it
         if os.path.isfile(path):
+            self.currdir = os.path.dirname(path)
             V = DetectViewer(path, parent=self)
 
 
     def launch_spot_viewer(self):
-        pass 
+        """
+        Launch an instance of SpotViewer on a sample file.
+
+        """
+        # Prompt the user to enter a set of localizations
+        path = getOpenFilePath(self, "Select locs CSV",
+            "CSV files (*.csv)", initialdir=self.currdir)
+
+        # Check that this is a real file path
+        if not os.path.isfile(path):
+            print("path %s does not exist" % path)
+            return 
+        else:
+            self.currdir = os.path.dirname(path)
+
+        # Try to find the corresponding image file
+        image_file = None 
+        if "_tracks.csv" in path:
+            nd2_file = path.replace("_tracks.csv", ".nd2")
+            tif_file = path.replace("_tracks.csv", ".tif")
+            if os.path.isfile(nd2_file):
+                image_file = nd2_file
+            elif os.path.isfile(tif_file):
+                image_file = tif_file
+
+        # Otherwise prompt the user to enter the corresponding
+        # image file
+        if image_file is None:
+            image_file = getOpenFilePath(self, "Select image file", 
+                "Image files (*.nd2 *.tif *.tiff)", initialdir=self.currdir)
+        else:
+            print("Found matching image file %s" % image_file)
+
+        # Check that this path exists
+        if not os.path.isfile(image_file):
+            print("path %s does not exist" % image_file)
+            return 
+
+        # Launch an instance of SpotViewer
+        V = SpotViewer(image_file, path, parent=self)
 
     def launch_track_viewer(self):
         pass 

@@ -937,6 +937,67 @@ def PromptSelectROI(image, parent=None):
 ## DIALOGS - FILE SELECTION ETC. ##
 ###################################
 
+class SingleComboBoxDialog(QDialog):
+    """
+    Prompt the user to select a single options from a 
+    drop-down menu.
+
+    After accepting, the result is held at self.return_val.
+
+    init
+    ----
+        label       :   str, the text to display immediately
+                        above the menu
+        options     :   list of str, menu options
+        init_value  :   str, initially selected menu option
+        title       :   str, dialog window title
+        parent      :   root QWidget
+
+    """
+    def __init__(self, label, options, init_value=None,
+        title=None, parent=None):
+
+        # Check inputs
+        if not (init_value is None):
+            assert init_value in options 
+
+        super(SingleComboBoxDialog, self).__init__(parent=parent)
+        self.label = label 
+        self.options = options
+        self.init_value = init_value 
+        self.title = title 
+        self.initUI()
+
+    def initUI(self):
+        """
+        Initialize the user interface.
+
+        """
+        # Set dialog window title
+        if not (self.title is None):
+            self.setWindowTitle(self.title)
+
+        layout = QVBoxLayout(self)
+
+        # Menu box
+        self.M_choice = LabeledQComboBox(self.options, 
+            self.label, init_value=self.init_value, parent=self)
+        layout.addWidget(self.M_choice, 0, alignment=Qt.AlignTop)
+
+        # Accept button
+        self.B_accept = QPushButton("Accept", parent=self)
+        layout.addWidget(self.B_accept, 1, alignment=Qt.AlignTop)
+        self.B_accept.clicked.connect(self.B_accept_callback)
+
+    def B_accept_callback(self):
+        """
+        Accept the current choice and assign it to 
+        self.return_val.
+
+        """
+        self.return_val = self.M_choice.currentText()
+        self.accept()
+
 class TextEntryDialog(QDialog):
     """
     Prompt the user to modify entry boxes with data. 
