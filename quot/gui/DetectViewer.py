@@ -40,7 +40,8 @@ from .guiUtils import FloatSlider, IntSlider, LabeledQComboBox, \
     ImageSubpositionWindow
 
 # Configuration settings for each slider
-CONFIG = read_config("quot/gui/CONFIG.toml")
+config_path = os.path.join(os.path.dirname(__file__), "CONFIG.toml")
+CONFIG = read_config(config_path)
 FILTER_SLIDER_CONFIG = CONFIG['filter_slider_config']
 DETECT_SLIDER_CONFIG = CONFIG['detect_slider_config']
 
