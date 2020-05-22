@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 """
-__main__.py -- high-level user functions for running
-filtering, detection, subpixel localization, and tracking
-sequentially on the same datasets
+core.py -- high-level user functions for running 
+filtering, detection, subpixel localization, and 
+tracking sequentially on the same datasets
 
 """
 # File paths
@@ -134,6 +134,3 @@ def track_directory(path, ext='.nd2', verbose=True,
     for path, out_csv in zip(image_paths, out_csvs):
         trajs = track_file(path, out_csv=out_csv, **kwargs)
         if verbose: print("Finished with file %s..." % path)
-
-
-
