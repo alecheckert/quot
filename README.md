@@ -29,24 +29,6 @@ quot main
 
 To run the filtering/detection module on a specific file, do
 ```
-quot gui samples/sample_movie.tif
+quot detect samples/sample_movie.tif
 ```
 
-Other options include running `quot` on a subregion of the input file, or only on specific frames. Once in the GUI, a settings file (for instance, `settings.yaml`) can be saved with the detection settings and then run on a file or directory of files with the command
-```
-quot loc samples settings.yaml
-```
-
-The GUI can also be launched from within Python using the `quot.gui.GUI` class:
-```
-from quot import gui
-
-filename = 'samples/sample_movie.tif'
-gui_inst = gui.GUI(filename)
-
-# If we only want to run on rectangular subregion
-gui_inst = gui.GUI(filename, subregion=[[100, 200], [150, 350]])
-
-# If we only want to run on frames 120 through 220 
-gui_inst = gui.GUI(filename, subregion=[[100, 200], [150, 350]], frame_limits=(120, 220))
-```
