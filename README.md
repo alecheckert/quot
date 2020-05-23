@@ -1,5 +1,5 @@
 # quot
-A simple GUI to compare spot detection methods in single molecule microscopy data
+A simple GUI to compare spot detection methods in single molecule tracking data
 
 ## Installation
 
@@ -14,9 +14,13 @@ git clone https://github.com/alecheckert/quot.git
     conda env create -f quot_env.yml
 ```
 
-3. Switch to the `quot` environment with `conda activate quot_env`. 
+3. Switch to the `quot` environment:
 
-4. Install the `quot` package. From the top-level `quot` directory, run
+```
+    conda activate quot_env
+```
+
+4. Next, install the `quot` package. From the top-level `quot` directory, run
 
 ```
 python setup.py develop
@@ -24,24 +28,50 @@ python setup.py develop
 
 `quot` is still in active development. The `develop` option  will track changes in the source files as new versions become available.
 
-## Example usage
+## Running the `quot` GUI
 
-`quot` does single molecule tracking with five steps:
+The easiest way to explore SPT options in `quot` is to use the GUI. To launch the GUI, first switch to the `quot` environment:
 
-    1. Read a frame from an image file
-    2. (Optional) Filter the frame to remove background
-    3. Find spots in the frame
-    4. Localize spots to subpixel resolution
-    5. Reconnect spots into trajectories
+```
+    conda activate quot_env
+```
 
-`sample_config.toml` is a sample `quot` configuration file that specifies parameters for each of these steps. To run tracking on a Nikon ND2 file with these settings, do
+Then start the main GUI with
+
+```
+    quot main
+```
+
+To get additional usage information, use
+```
+quot --help
+```
+
+Other `quot` commands are mostly shortcuts to lower-level GUIs. For example, to run the filtering/detection module on a specific file, do
+```
+quot detect samples/sample_movie.tif
+```
+
+## Running localization and tracking with `quot`
+
+`quot` performs single molecule tracking with five steps:
+
+1. Read a frame from an image file
+2. (Optional) Filter the frame to remove background
+3. Find spots in the frame
+4. Localize spots to subpixel resolution
+5. Reconnect spots into trajectories
+
+Exactly how each step is performed can be specified with a config file. (`quot` uses Tom's Obvious, Minimal Language (TOML) files.) 
+
+As an example, `sample_config.toml` is a `quot` configuration file that specifies parameters for each of these steps. If you wanted to use these settings to run localization and tracking on a Nikon ND2 file, use
 
 ```
     from quot.read import read_config
     from quot.core import track_file
 
-    # Specify target
-    target_path = "spt_movie.nd2"
+    # Specify target (ND2 and TIF files supported)
+    target_path = "some_spt_movie.nd2"
 
     # Read the configuration
     config = read_config("sample_config.toml")
@@ -50,21 +80,15 @@ python setup.py develop
     locs = track_file(target_path, **config)
 ```
 
-## Running the `quot` GUI
+Batch localization and tracking can also be run on directories with SPT movies using the `track_directory` command:
 
-The easiest way to start exploring SPT options in `quot` is to use the `quot` GUI. 
+```
+    from quot.core import track_directory
 
-`quot` can be run on the command line on either ND2 or TIF files. To get usage information, use
-```
-quot --help
-```
+    # Run localization and tracking on each ND2 file in 
+    # this directory
+    track_directory("path/to/ND2/files", **config)
 
-To launch a menu with options to option other GUIs, do
-```
-quot main
 ```
 
-`quot` also has a variety of other commands. These are mostly shortcuts to lower-level GUIs. For example, to run the filtering/detection module on a specific file, do
-```
-quot detect samples/sample_movie.tif
-```
+`quot` saves the result of localization and tracking as CSVs.
