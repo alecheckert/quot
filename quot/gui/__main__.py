@@ -15,10 +15,11 @@ import click
 from PySide2.QtWidgets import QApplication
 
 # GUIs
-from .Launcher import Launcher 
-from .DetectViewer import DetectViewer 
-from .SpotViewer import SpotViewer 
-from .AttributeViewer import AttributeViewer 
+from .launcher import Launcher 
+from .imageViewer import ImageViewer
+from .detectViewer import DetectViewer 
+from .spotViewer import SpotViewer 
+from .attributeViewer import AttributeViewer 
 
 # Custom GUI utilities
 from .guiUtils import set_dark_app

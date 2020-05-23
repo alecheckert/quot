@@ -16,10 +16,10 @@ from PySide2.QtWidgets import QApplication, QWidget, QLabel, \
 
 # Custom GUI utilities
 from .guiUtils import set_dark_app, getOpenFilePath
-from .ImageViewer import ImageViewer 
-from .DetectViewer import DetectViewer 
-from .SpotViewer import SpotViewer 
-from .AttributeViewer import AttributeViewer 
+from .imageViewer import ImageViewer 
+from .detectViewer import DetectViewer 
+from .spotViewer import SpotViewer 
+from .attributeViewer import AttributeViewer 
 
 class Launcher(QWidget):
     """

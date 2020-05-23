@@ -28,7 +28,7 @@ A simple GUI to compare spot detection methods in single molecule tracking data.
 
 `quot` is still in active development. The `develop` option  will track changes in the source files as new versions become available.
 
-## Running the `quot` GUI
+## Run the `quot` GUI
 
 The easiest way to explore SPT options in `quot` is to use the GUI. To launch the GUI, first switch to the `quot` environment:
 
@@ -52,7 +52,7 @@ Other `quot` commands are mostly shortcuts to lower-level GUIs. For example, to 
     quot detect samples/sample_movie.tif
 ```
 
-## Running localization and tracking with `quot`
+## Run localization and tracking with `quot`
 
 `quot` performs single molecule tracking with five steps:
 
