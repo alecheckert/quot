@@ -19,6 +19,7 @@ from .guiUtils import set_dark_app, getOpenFilePath
 from .ImageViewer import ImageViewer 
 from .DetectViewer import DetectViewer 
 from .SpotViewer import SpotViewer 
+from .AttributeViewer import AttributeViewer 
 
 class Launcher(QWidget):
     """
@@ -156,7 +157,23 @@ class Launcher(QWidget):
         pass 
 
     def launch_attribute_viewer(self):
-        pass 
+        """
+        Launch an instance of AttributeViewer on a sample file.
+
+        """
+        # Prompt the user to enter a set of localizations
+        path = getOpenFilePath(self, "Select locs CSV",
+            "CSV files (*.csv)", initialdir=self.currdir)
+
+        # Check that this is a real file path
+        if not os.path.isfile(path):
+            print("path %s does not exist" % path)
+            return 
+        else:
+            self.currdir = os.path.dirname(path)
+
+        # Launch an instance of AttributeViewer
+        V = AttributeViewer(path, max_spots=30000, parent=self)
 
 def init_launcher():
     """

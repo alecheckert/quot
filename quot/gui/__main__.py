@@ -18,6 +18,7 @@ from PySide2.QtWidgets import QApplication
 from .Launcher import Launcher 
 from .DetectViewer import DetectViewer 
 from .SpotViewer import SpotViewer 
+from .AttributeViewer import AttributeViewer 
 
 # Custom GUI utilities
 from .guiUtils import set_dark_app
@@ -72,6 +73,17 @@ def spot_viewer(image_path, locs_path, **kwargs):
 
     """
     launch_gui(SpotViewer, image_path, locs_path, **kwargs)
+
+@cli.command()
+@click.argument("locs_path", type=str)
+@click.option("-n", "--max_spots", type=int, default=10000, help='default 10000')
+@click.option("-s", "--gui_size", type=int, default=600, help="default 600")
+def attributes(locs_path, **kwargs):
+    """
+    Make a scatter plot of localization attributes.
+
+    """
+    launch_gui(AttributeViewer, locs_path, **kwargs)
 
 if __name__ == '__main__':
     cli()

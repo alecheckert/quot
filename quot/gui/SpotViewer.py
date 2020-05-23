@@ -41,7 +41,7 @@ from pyqtgraph.graphicsItems import ScatterPlotItem as SPI_base
 from .guiUtils import FloatSlider, IntSlider, LabeledQComboBox, \
     set_dark_app, Symbols, keys_to_str, MASTER_COLOR, \
     SingleComboBoxDialog, ImageSubpositionWindow, \
-    ImageSubpositionCompare
+    ImageSubpositionCompare, format_dict 
 
 # Default parameters for spot overlays
 pen_width = 3
@@ -54,9 +54,42 @@ condition_colors = ['#FF5454', '#2DA8FF']
 # Custom overlay symbols a little
 SPI_base.Symbols['+'] = Symbols['alt +']
 SPI_base.Symbols['open +'] = Symbols['open +']
-symbol_sizes = {'+': 16.0, 'o': 16.0, 'open +': 16.0}
+symbol_sizes = {'+': 16.0, 'o': 16.0, 'open +': 20.0}
 
 class SpotViewer(QWidget):
+    """
+    Overlay localizations or trajectories onto a raw movie.
+    Useful for QC.
+
+    The user sees a single image window with the current
+    frame and some overlaid localizations.
+
+    Each localization is either colored identically or 
+    according to a color scheme. Available color schemes are
+
+        - color each localization by its trajectory index 
+            (same color for locs in the same trajectory)
+
+        - color each localization by one of its numerical
+            attributes (e.g. intensity, BG, H_det, etc.)
+
+        - color each localization one of two colors according
+            to its value for a boolean attribute.
+
+    SpotViewer provides the user a way to create new boolean
+    attributes by thresholding attributes, via the "Create
+    Boolean attribute" button.
+
+    args
+    ----
+        image_path          :   str, path to image file (e.g.
+                                *.nd2, *.tif, or *.tiff)
+        locs_path           :   str, path to CSV with localizations
+        gui_size            :   int
+        start_frame         :   int, the initial frame shown
+        parent              :   root QWidget
+
+    """
     def __init__(self, image_path, locs_path, gui_size=800,
         start_frame=0, parent=None):
         super(SpotViewer, self).__init__(parent=parent)
@@ -158,8 +191,8 @@ class SpotViewer(QWidget):
         self.graphItem.setParentItem(self.imageView.imageItem)
 
         # # Make spots clickable
-        # self.lastClicked = []
-        # self.scatterPlotItem.sigClicked.connect(self.spot_clicked)
+        self.lastClicked = []
+        self.scatterPlotItem.sigClicked.connect(self.spot_clicked)
 
         ## WIDGETS
         widget_align = Qt.AlignTop
@@ -194,14 +227,14 @@ class SpotViewer(QWidget):
         L_left.addWidget(self.M_symbol, 2, 0, alignment=widget_align)
 
         # Menu to select how the spots are colored
-        color_by_options = ["None", "Trajectory", "Attribute", "Binary condition"]
+        color_by_options = ["None", "Trajectory", "Quantitative attribute", "Boolean attribute"]
         self.M_color_by = LabeledQComboBox(color_by_options, 
             "Color spots by", init_value="None", parent=self.win_left)
         self.M_color_by.assign_callback(self.M_color_by_callback)
         L_left.addWidget(self.M_color_by, 3, 0, alignment=widget_align)
 
         # Create a new binary spot condition
-        self.B_create_condition = QPushButton("Create binary condition", 
+        self.B_create_condition = QPushButton("Create Boolean attribute", 
             parent=self.win_left)
         self.B_create_condition.clicked.connect(self.B_create_condition_callback)
         L_left.addWidget(self.B_create_condition, 4, 0, alignment=widget_align)
@@ -209,7 +242,7 @@ class SpotViewer(QWidget):
         # Select the binary column that determines color when "condition"
         # is selected as the color-by attribute
         condition_options = [c for c in self.locs.columns if self.locs[c].dtype == 'bool']
-        self.M_condition = LabeledQComboBox(condition_options, "Binary condition",
+        self.M_condition = LabeledQComboBox(condition_options, "Boolean attribute",
             init_value="None", parent=self.win_left)
         L_left.addWidget(self.M_condition, 3, 1, alignment=widget_align)
         self.M_condition.assign_callback(self.M_condition_callback)
@@ -309,12 +342,12 @@ class SpotViewer(QWidget):
                     spots=self.generate_color_spot_dict("traj_color"),
                     data=self.locs_data
                 )
-            elif color_by == "Attribute": 
+            elif color_by == "Quantitative attribute": 
                 self.scatterPlotItem.setData(
                     spots=self.generate_color_spot_dict("attrib_color"),
                     data=self.locs_data,
                 )
-            elif color_by == "Binary condition":
+            elif color_by == "Boolean attribute":
                 self.scatterPlotItem.setData(
                     spots=self.generate_color_spot_dict("condition_color"),
                     data=self.locs_data,
@@ -446,6 +479,22 @@ class SpotViewer(QWidget):
 
     ## WIDGET CALLBACKS
 
+    def spot_clicked(self, plot, points):
+        """
+        Respond to a spot being selected by the user: change
+        its color and print all of its associated information
+        to the terminal.
+
+        """
+        for p in self.lastClicked:
+            p.resetPen()
+
+        for p in points:
+            print("Spot:")
+            print(format_dict(p.data()))
+            p.setPen('w', width=3)
+        self.lastClicked = points 
+
     def frame_slider_callback(self):
         """
         Respond to a user change in the frame slider.
@@ -478,11 +527,12 @@ class SpotViewer(QWidget):
 
         """
         color_by = self.M_color_by.currentText()
-        if color_by == "Attribute":
+        if color_by == "Quantitative attribute":
 
             # Prompt the user to select an attribute to color by
             options = [c for c in self.locs.columns if \
-                self.locs[c].dtype in ["int64", "float64"]]
+                self.locs[c].dtype in ["int64", "float64", "uint8", \
+                    "uint16", "float32", "uint32", "int32"]]
             ex = SingleComboBoxDialog("Attribute", options, 
                 init_value="I0", title="Choose attribute color by",
                 parent=self)
@@ -503,7 +553,7 @@ class SpotViewer(QWidget):
             # Update the current set of localizations
             self.load_spots(self.frame_slider.value())
 
-        elif color_by == "Binary condition":
+        elif color_by == "Boolean attribute":
             self.assign_attribute_colors(self.M_condition.currentText())
             self.overlay_spots()
 
@@ -536,8 +586,8 @@ class SpotViewer(QWidget):
 
     def B_create_condition_callback(self):
         """
-        Launch a sub-GUI to generate a binary condition on 
-        one of the spot attributes.
+        Launch a sub-GUI to generate a Boolean attribute on 
+        from one of the spot columns.
 
         """
         # Prompt the user to create a condition
@@ -568,15 +618,15 @@ class SpotViewer(QWidget):
             # Update plots, assuming that the user wants to see the 
             # result immediately
             self.M_condition.QComboBox.setCurrentText(condition_name)
-            self.M_color_by.QComboBox.setCurrentText("Binary condition")
+            self.M_color_by.QComboBox.setCurrentText("Boolean attribute")
             self.assign_condition_colors(condition_name)
             self.load_spots()
             self.overlay_spots()
 
     def M_condition_callback(self):
         """
-        Select the current binary condition to use for determining
-        color when using the "Binary condition" option in M_color_by.
+        Select the current Boolean attribute to use for determining
+        color when using the "Boolean attribute" option in M_color_by.
 
         """
         # Get the new condition name
@@ -596,18 +646,18 @@ class SpotViewer(QWidget):
         frame and subsequent frames.
 
         This callback has two behaviors, depending on the current 
-        state of self.M_color_by. If we're color by a binary condition,
+        state of self.M_color_by. If we're color by a Boolean attribute,
         then launch a ImageSubpositionCompare window. Else launch a 
         ImageSubpositionWindow. The former compares two sets of spots
         side-by-side, while the second is just a single grid of spots.
 
         """
-        if self.M_color_by.currentText() == "Binary condition":
+        if self.M_color_by.currentText() == "Boolean attribute":
 
             # Size of image grid
             N = 8
 
-            # Get the current binary condition column
+            # Get the current Boolean attribute column
             col = self.M_condition.currentText()
 
             # Get as many spots as we can to fill this image grid
@@ -702,7 +752,7 @@ class ConditionDialog(QDialog):
         self.load_col(init_col)
 
         # Main plot
-        self.PlotWidget = PlotWidget(name="Create binary condition")
+        self.PlotWidget = PlotWidget(name="Create Boolean attribute")
         L.addWidget(self.PlotWidget, 0, 0, alignment=widget_align)
 
         # Histogram
@@ -741,7 +791,7 @@ class ConditionDialog(QDialog):
         self.hmax = np.percentile(self.data, 99.9)
 
         # Binning scheme
-        n_bins = 100
+        n_bins = 5000
         bin_size = (self.hmax - self.hmin) / n_bins
         self.bin_edges = np.arange(self.hmin, self.hmax, bin_size)
 

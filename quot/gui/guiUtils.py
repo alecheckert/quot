@@ -73,6 +73,23 @@ def keys_to_str(dict_keys):
     """
     return [str(j) for j in dict_keys]
 
+def format_dict(D):
+    """
+    Format a dictionary for pretty-printing to the terminal.
+
+    args
+    ----
+        D   :   dict
+
+    returns
+    -------
+        str
+
+    """
+    keys = keys_to_str(D.keys())
+    n = max([len(k) for k in keys])+1
+    return '\n'.join(['  %s:%s%s' % (k, ' '*(n-len(k)), D[k]) for k in keys])
+
 def coerce_type(arg, type_):
     """
     Try to coerce a string into the type class *type_*.
