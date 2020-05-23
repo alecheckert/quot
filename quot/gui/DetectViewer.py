@@ -22,7 +22,7 @@ from ..read import read_config
 from ..chunkFilter import ChunkFilter
 
 # Core detection function
-from ..spot import detect 
+from ..findSpots import detect 
 
 # Core GUI utilities
 from PySide2.QtCore import Qt 

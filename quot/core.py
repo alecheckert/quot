@@ -19,7 +19,7 @@ import pandas as pd
 from .chunkFilter import ChunkFilter
 
 # Core detection function
-from .spot import detect 
+from .findSpots import detect 
 
 # Core localization function
 from .subpixel import localize_frame

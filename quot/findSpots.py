@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-quot.spot.py -- find spots by many methods
+findSpots.py -- detect spots in 2D images
 
 """
 # Numeric
