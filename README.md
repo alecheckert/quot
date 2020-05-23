@@ -67,8 +67,7 @@ Exactly how each step is performed can be specified with a config file. `quot` u
 `sample_config.toml` is a `quot` configuration file. To use these settings to run localization and tracking on a Nikon ND2 file:
 
 ```
-    from quot.read import read_config
-    from quot.core import track_file
+    from quot import read_config, track_file
 
     # Specify target (ND2 and TIF files supported)
     target_path = "samples/sample_movie.tif"
@@ -83,7 +82,7 @@ Exactly how each step is performed can be specified with a config file. `quot` u
 Batch tracking can also be run on directories with SPT movies using the `track_directory` command:
 
 ```
-    from quot.core import track_directory
+    from quot import track_directory
 
     # Run localization and tracking on each ND2 file in 
     # this directory, saving results as CSVs
