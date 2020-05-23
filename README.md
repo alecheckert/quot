@@ -1,7 +1,7 @@
 # quot
 A simple GUI to compare spot detection methods in single molecule tracking data.
 
-## Installation
+## Install
 
 1. Clone the repository:
 ```
