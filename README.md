@@ -5,7 +5,7 @@ A simple GUI to compare spot detection methods in single molecule tracking data.
 
 1. Clone the repository:
 ```
-git clone https://github.com/alecheckert/quot.git
+    git clone https://github.com/alecheckert/quot.git
 ```
 
 2. Create a `conda` environment for `quot`. (If you don't already have it, you'll need `conda`: https://docs.conda.io/en/latest/miniconda.html.) Navigate to the top-level `quot` directory and run 
@@ -20,10 +20,10 @@ git clone https://github.com/alecheckert/quot.git
     conda activate quot_env
 ```
 
-4. Next, install the `quot` package. From the top-level `quot` directory, run
+4. Finally, install the `quot` package. From the top-level `quot` directory, run
 
 ```
-python setup.py develop
+    python setup.py develop
 ```
 
 `quot` is still in active development. The `develop` option  will track changes in the source files as new versions become available.
@@ -44,7 +44,7 @@ Then start the main GUI with
 
 To get additional usage information, use
 ```
-quot --help
+    quot --help
 ```
 
 Other `quot` commands are mostly shortcuts to lower-level GUIs. For example, to run the filtering/detection module on a specific file, do
@@ -62,9 +62,9 @@ quot detect samples/sample_movie.tif
 4. Localize spots to subpixel resolution
 5. Reconnect spots into trajectories
 
-Exactly how each step is performed can be specified with a config file. (`quot` uses Tom's Obvious, Minimal Language (TOML) files.) 
+Exactly how each step is performed can be specified with a config file. `quot` uses Tom's Obvious, Minimal Language (TOML) format.
 
-As an example, `sample_config.toml` is a `quot` configuration file that specifies parameters for each of these steps. If you wanted to use these settings to run localization and tracking on a Nikon ND2 file, use
+`sample_config.toml` is a `quot` configuration file. To use these settings to run localization and tracking on a Nikon ND2 file:
 
 ```
     from quot.read import read_config
@@ -80,15 +80,13 @@ As an example, `sample_config.toml` is a `quot` configuration file that specifie
     locs = track_file(target_path, **config)
 ```
 
-Batch localization and tracking can also be run on directories with SPT movies using the `track_directory` command:
+Batch tracking can also be run on directories with SPT movies using the `track_directory` command:
 
 ```
     from quot.core import track_directory
 
     # Run localization and tracking on each ND2 file in 
-    # this directory
-    track_directory("path/to/ND2/files", **config)
+    # this directory, saving results as CSVs
+    track_directory("path/to/ND2/files", ext=".nd2", **config)
 
 ```
-
-`quot` saves the result of localization and tracking as CSVs.
