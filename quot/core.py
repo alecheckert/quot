@@ -16,7 +16,7 @@ from tqdm import tqdm
 import pandas as pd 
 
 # File readers and filterers
-from .ChunkFilter import ChunkFilter
+from .chunkFilter import ChunkFilter
 
 # Core detection function
 from .spot import detect 

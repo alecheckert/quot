@@ -19,7 +19,7 @@ import pandas as pd
 from ..read import read_config 
 
 # Image file reader
-from ..ChunkFilter import ChunkFilter
+from ..chunkFilter import ChunkFilter
 
 # Core detection function
 from ..spot import detect 
