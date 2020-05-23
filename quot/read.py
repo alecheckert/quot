@@ -251,7 +251,7 @@ class ImageReader(object):
         if self.ext == '.nd2':
             return self._reader.get_frame_2D(t=frame_index)
         elif self.ext == '.tif':
-            return reader.pages[frame_index].asarray()
+            return self._reader.pages[frame_index].asarray()
 
     def get_frame_range(self, start, stop):
         """
