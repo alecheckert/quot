@@ -49,7 +49,7 @@ To get additional usage information, use
 
 Other `quot` commands are mostly shortcuts to lower-level GUIs. For example, to run the filtering/detection module on a specific file, do
 ```
-quot detect samples/sample_movie.tif
+    quot detect samples/sample_movie.tif
 ```
 
 ## Running localization and tracking with `quot`
@@ -71,10 +71,10 @@ Exactly how each step is performed can be specified with a config file. `quot` u
     from quot.core import track_file
 
     # Specify target (ND2 and TIF files supported)
-    target_path = "some_spt_movie.nd2"
+    target_path = "samples/sample_movie.tif"
 
     # Read the configuration
-    config = read_config("sample_config.toml")
+    config = read_config("samples/sample_config.toml")
 
     # Run localization and tracking on the file
     locs = track_file(target_path, **config)
