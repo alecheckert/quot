@@ -392,7 +392,7 @@ class SpotViewer(QWidget):
 
         else:
             self.locs["traj_color"] = self.colors_0[
-                self.locs["trajectory"] % self.n_colors]
+                (self.locs["trajectory"]*9277) % self.n_colors]
 
             # If a spot is not assigned to a trajectory, its color is white
             unassigned = self.locs["trajectory"] == -1 
