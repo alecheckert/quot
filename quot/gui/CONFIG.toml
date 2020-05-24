@@ -1,0 +1,309 @@
+[filter_slider_config]
+
+[filter_slider_config.identity]
+
+[filter_slider_config.sub_min]
+    [filter_slider_config.sub_min.scale]
+        name = "scale"
+        minimum = 0.7
+        maximum = 1.2
+        interval = 0.01
+        init_value = 0.8
+        type = "float"
+
+[filter_slider_config.sub_median]
+    [filter_slider_config.sub_median.scale]
+        name = "scale"
+        minimum = 0.7
+        maximum = 1.2
+        interval = 0.01
+        init_value = 0.8
+        type = "float"
+
+[filter_slider_config.sub_mean]
+    [filter_slider_config.sub_mean.scale]
+        name = "scale"
+        minimum = 0.7
+        maximum = 1.2
+        interval = 0.01
+        init_value = 0.8
+        type = "float"
+
+[filter_slider_config.sub_gauss_filt_min]
+    [filter_slider_config.sub_gauss_filt_min.scale]
+        name = "scale"
+        minimum = 0.7
+        maximum = 1.2
+        interval = 0.01
+        init_value = 0.8
+        type = "float"   
+    [filter_slider_config.sub_gauss_filt_min.k]
+        name = "k"
+        minimum = 0
+        maximum = 7.0
+        interval = 0.1
+        init_value = 3.0
+        type = "float"
+
+[filter_slider_config.sub_gauss_filt_median]
+    [filter_slider_config.sub_gauss_filt_median.scale]
+        name = "scale"
+        minimum = 0.7
+        maximum = 1.2
+        interval = 0.01
+        init_value = 0.8
+        type = "float"   
+    [filter_slider_config.sub_gauss_filt_median.k]
+        name = "k"
+        minimum = 0
+        maximum = 7.0
+        interval = 0.1
+        init_value = 3.0
+        type = "float"
+
+[filter_slider_config.sub_gauss_filt_mean]
+    [filter_slider_config.sub_gauss_filt_mean.scale]
+        name = "scale"
+        minimum = 0.7
+        maximum = 1.2
+        interval = 0.01
+        init_value = 0.8
+        type = "float"   
+    [filter_slider_config.sub_gauss_filt_mean.k]
+        name = "k"
+        minimum = 0
+        maximum = 7.0
+        interval = 0.1
+        init_value = 3.0
+        type = "float"       
+
+
+[detect_slider_config.gauss]
+    [detect_slider_config.gauss.k]
+        name = "k"
+        minimum = 0.1
+        maximum = 7.0
+        interval = 0.1
+        init_value = 1.0
+        type = "float"
+    [detect_slider_config.gauss.w]
+        name = "w"
+        minimum = 1
+        maximum = 21
+        interval = 1
+        init_value = 9
+        type = "int"
+    [detect_slider_config.gauss.t]
+        name = "t"
+        minimum = 0.0
+        maximum = 1000.0
+        interval = 0.1
+        init_value = 200.0
+        type = "float"
+
+[detect_slider_config.centered_gauss]
+    [detect_slider_config.centered_gauss.k]
+        name = "k"
+        minimum = 0.1
+        maximum = 7.0
+        interval = 0.1
+        init_value = 1.0
+        type = "float"
+    [detect_slider_config.centered_gauss.w]
+        name = "w"
+        minimum = 1
+        maximum = 21
+        interval = 1
+        init_value = 9
+        type = "int"
+    [detect_slider_config.centered_gauss.t]
+        name = "t"
+        minimum = 0.0
+        maximum = 1000.0
+        interval = 0.1
+        init_value = 200.0
+        type = "float"
+
+[detect_slider_config.mle_amp]
+    [detect_slider_config.mle_amp.k]
+        name = "k"
+        minimum = 0.1
+        maximum = 7.0
+        interval = 0.1
+        init_value = 1.0
+        type = "float"
+    [detect_slider_config.mle_amp.w]
+        name = "w"
+        minimum = 1
+        maximum = 21
+        interval = 1
+        init_value = 9
+        type = "int"
+    [detect_slider_config.mle_amp.t]
+        name = "t"
+        minimum = 0.0
+        maximum = 1000.0
+        interval = 0.1
+        init_value = 200.0
+        type = "float"
+
+[detect_slider_config.dog]
+    [detect_slider_config.dog.k0]
+        name = "k0"
+        minimum = 0.1
+        maximum = 4.0
+        interval = 0.1
+        init_value = 1.0
+        type = "float"
+    [detect_slider_config.dog.k1]
+        name = "k1"
+        minimum = 2.0
+        maximum = 15.0
+        interval = 0.1
+        init_value = 3.0
+        type = "float"
+    [detect_slider_config.dog.w]
+        name = "w"
+        minimum = 1
+        maximum = 21
+        interval = 1
+        init_value = 9
+        type = "int"
+    [detect_slider_config.dog.t]
+        name = "t"
+        minimum = 0.0
+        maximum = 1000.0
+        interval = 0.1
+        init_value = 200.0
+        type = "float"
+
+[detect_slider_config.log]
+    [detect_slider_config.log.k]
+        name = "k"
+        minimum = 0.1
+        maximum = 7.0
+        interval = 0.1
+        init_value = 1.0
+        type = "float"
+    [detect_slider_config.log.w]
+        name = "w"
+        minimum = 1
+        maximum = 21
+        interval = 1
+        init_value = 11
+        type = "int"
+    [detect_slider_config.log.t]
+        name = "t"
+        minimum = 0.0
+        maximum = 1000.0
+        interval = 0.1
+        init_value = 200.0
+        type = "float"
+
+[detect_slider_config.dou]
+    [detect_slider_config.dou.w0]
+        name = "w0"
+        minimum = 1
+        maximum = 11
+        interval = 1
+        init_value = 3
+        type = "int"
+    [detect_slider_config.dou.w1]
+        name = "w1"
+        minimum = 3
+        maximum = 21
+        interval = 1
+        init_value = 11
+        type = "int"
+    [detect_slider_config.dou.t]
+        name = "t"
+        minimum = 0.0
+        maximum = 1000.0
+        interval = 0.1
+        init_value = 200.0
+        type = "float"
+
+[detect_slider_config.min_max]
+    [detect_slider_config.min_max.w]
+        name = "w"
+        minimum = 3
+        maximum = 21
+        interval = 1
+        init_value = 9
+        type = "int"
+    [detect_slider_config.min_max.t]
+        name = "t"
+        minimum = 0.0
+        maximum = 1000.0
+        interval = 0.1
+        init_value = 200.0
+        type = "float"
+
+[detect_slider_config.gauss_filt_min_max]
+    [detect_slider_config.gauss_filt_min_max.k]
+        name = "k"
+        minimum = 0.1
+        maximum = 7.0
+        interval = 0.1
+        init_value = 1.0
+        type = "float"
+    [detect_slider_config.gauss_filt_min_max.w]
+        name = "w"
+        minimum = 3
+        maximum = 21
+        interval = 1
+        init_value = 9
+        type = "int"
+    [detect_slider_config.gauss_filt_min_max.t]
+        name = "t"
+        minimum = 0.0
+        maximum = 1000.0
+        interval = 0.1
+        init_value = 200.0
+        type = "float"
+
+[detect_slider_config.llr]
+    [detect_slider_config.llr.k]
+        name = "k"
+        minimum = 0.1
+        maximum = 7.0
+        interval = 0.1
+        init_value = 1.0
+        type = "float"
+    [detect_slider_config.llr.w]
+        name = "w"
+        minimum = 3
+        maximum = 21
+        interval = 1
+        init_value = 9
+        type = "int"
+    [detect_slider_config.llr.t]
+        name = "t"
+        minimum = 0.0
+        maximum = 30.0
+        interval = 0.1
+        init_value = 18.0
+        type = "float"
+
+[detect_slider_config.llr_rect]
+    [detect_slider_config.llr_rect.w0]
+        name = "w0"
+        minimum = 1
+        maximum = 11
+        interval = 1
+        init_value = 3
+        type = "int"
+    [detect_slider_config.llr_rect.w1]
+        name = "w1"
+        minimum = 3
+        maximum = 21
+        interval = 1
+        init_value = 11
+        type = "int"
+    [detect_slider_config.llr_rect.t]
+        name = "t"
+        minimum = 0.0
+        maximum = 30.0
+        interval = 0.1
+        init_value = 18.0
+        type = "float"
