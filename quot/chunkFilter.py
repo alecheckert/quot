@@ -112,6 +112,7 @@ class ChunkFilter(ImageReader):
         self.chunk_starts = np.zeros(n_chunks+1, dtype='int64')
         self._offset = self.start % self.chunk_size
         self.chunk_starts[1:] = np.arange(n_chunks)*self.chunk_size+self._offset
+        self.chunk_starts = self.chunk_starts[self.chunk_starts<self.n_frames]
 
         # Special case: last chunk 
         self.chunk_starts[-1] = self.n_frames - self.chunk_size
@@ -311,6 +312,7 @@ class ChunkFilter(ImageReader):
 
         if not self._in_chunk(frame_index):
             self.chunk_start = self.get_chunk_start(frame_index)
+            print("loading new chunk for frame %d: chunk start %d" % (frame_index, self.chunk_start))
             self.load_chunk(self.chunk_start)
 
         return FILTER_METHODS.get(self.method)(

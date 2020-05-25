@@ -224,7 +224,8 @@ class TestWriteSaveConfig(unittest.TestCase):
 class TestChunkFilter(unittest.TestCase):
     """
     A variety of tests for the quot.chunkFilter.ChunkFilter
-    class.
+    class, particularly making sure that we're retrieving the 
+    correct frames when using the block filtering mechanism.
 
     """
     def setUp(self):
@@ -241,24 +242,28 @@ class TestChunkFilter(unittest.TestCase):
 
         print("Are we filtering the correct frames? (chunk_size 20, start 10)")
         F = ChunkFilter(self.nd2_path, start=10, chunk_size=20, method='identity')
+        stack = F.imread()
         frames = np.arange(10, F.n_frames)
-        # for frame_idx, frame_0 in zip(frames, F):
-        #     testing.assert_allclose(frame_0, F.get_frame(frame_idx), atol=1.0e-10)
-        # print("\tyes")
-
-        # print("Are we filtering the correct frames? (chunk_size 15, start 0, stop 40)")
-        # F = ChunkFilter(self.nd2_path, start=0, stop=40, chunk_size=15, method='identity')
-        # frames = np.arange(0, 40)
-        # for frame_idx, frame_0 in zip(frames, F):
-        #     testing.assert_allclose(frame_0, F.get_frame(frame_idx), atol=1.0e-10)
-        # print("\tyes")
-
-        for j, i in enumerate(F):
-            print('Frame %d' % (j+10))
-            print((i == F.get_frame(j+10)).all())
-            print('\n')
-
+        for frame_idx, frame_0 in zip(frames, F):
+            testing.assert_allclose(frame_0, F.get_frame(frame_idx), atol=1.0e-10)
+        print("\tyes")
         F.close()
 
+        print("Are we filtering the correct frames? (chunk_size 15, start 0, stop 40)")
+        F = ChunkFilter(self.nd2_path, start=0, stop=40, chunk_size=15, method='identity')
+        frames = np.arange(0, 40)
+        for frame_idx, frame_0 in zip(frames, F):
+            testing.assert_allclose(frame_0, F.get_frame(frame_idx), atol=1.0e-10)
+        print("\tyes")
+        F.close()
 
+        start = 60
+        chunk_size = 30
+        print("Are we filtering the correct frames? (chunk_size 30, start 60)")
+        F = ChunkFilter(self.nd2_path, start=start, chunk_size=chunk_size, method='identity')
+        frames = np.arange(start, F.n_frames)
+        for frame_idx, frame_0 in zip(frames, F):
+            testing.assert_allclose(frame_0, F.get_frame(frame_idx), atol=1.0e-10)
+        print("\tyes")
+        F.close()
 
