@@ -21,9 +21,49 @@ from .helper import (
     connected_components
 )
 
+# Deep copy
+from copy import copy 
+
 ##################################
 ## LOW-LEVEL TRACKING UTILITIES ##
 ##################################
+
+def is_duplicates(trajs):
+    """
+    Return True if there are duplicates in a set of Trajectories.
+
+    """
+    if len(trajs) < 2:
+        return False 
+    for j in range(len(trajs)-1):
+        for i in range(j+1, len(trajs)):
+            R = (trajs[i].get_slice()[:,:2]==trajs[j].get_slice()[:,:2])
+            if isinstance(R, bool):
+                if R:
+                    return True 
+            elif R.all():
+                return True 
+            else:
+                pass
+    return False 
+
+def has_match(trajs_0, trajs_1):
+    """
+    Return True if a trajectory in trajs_0 exactly matches a trajectory
+    in trajs_1.
+
+    """
+    for i in range(len(trajs_0)):
+        for j in range(len(trajs_1)):
+            R = (trajs_0[i].get_slice()[:,:2] == trajs_1[j].get_slice()[:,:2])
+            if isinstance(R, bool):
+                if R:
+                    return True 
+            elif R.all():
+                return True 
+            else:
+                pass 
+    return False 
 
 class Trajectory():
     """
@@ -321,7 +361,7 @@ def euclidean_weight_matrix(trajs, locs, pixel_size_um=0.16,
 ######################################
 
 def reconnect_conservative(trajs, locs, locs_array, max_blinks=0,
-    frame_interval=0.00548, pixel_size_um=0.16):
+    frame_interval=0.00548, pixel_size_um=0.16, **kwargs):
     """
     Only reassign trajs to locs when the assignment is 
     unambiguous (1 traj, 1 loc within the search radius).
@@ -337,6 +377,8 @@ def reconnect_conservative(trajs, locs, locs_array, max_blinks=0,
         max_blinks      :   int
         frame_interval  :   float
         pixel_size_um   :   float
+        kwargs          :   ignored, possibly passed due to upstream
+                            method disambiguation
 
     returns
     -------
@@ -588,8 +630,8 @@ def track(locs, method="diffusion", search_radius=2.5,
     # Convenience function: in a list of Trajectory, find 
     # trajectories that have finished
     def get_finished(trajs):
-        _finished = [t for t in filter(lambda i: ~i.active, trajs)]
-        _active = [t for t in filter(lambda i: i.active, trajs)]
+        _finished = [t for t in trajs if not t.active]
+        _active = [t for t in trajs if t.active]
         return _active, _finished
 
     # Start by grabbing the locs in the first frame and 
@@ -607,6 +649,21 @@ def track(locs, method="diffusion", search_radius=2.5,
     completed = []
 
     for fi in range(start_frame+1, stop_frame):
+
+        # # DEBUG
+        # print("FRAME:\t%d" % fi)
+        # print("Duplicates in active:\t", is_duplicates(active))
+        # print("Duplicates in new:\t", is_duplicates(new))
+        # print("Duplicates in completed:\t", is_duplicates(completed))
+        # print("Completed trajectories:")
+        # for i, t in enumerate(completed):
+        #     print("\tTrajectory %d" % i)
+        #     print(t.get_slice()[:,:2])
+        # print("\n")
+
+        # if fi > 7:
+        #     break 
+
         frame_locs = get_locs(fi)
 
         # If there are no locs in this frame, set all active
@@ -650,6 +707,27 @@ def track(locs, method="diffusion", search_radius=2.5,
             subgraphs, Ti, Li, traj_singlets, loc_singlets = \
                 connected_components(adj_g)
 
+            # # DEBUG - PASSED
+            # for i in range(len(Ti)):
+            #     for j in [k for k in range(len(Ti)) if k != i]:
+            #         for element in Ti[i]:
+            #             assert element not in Ti[j]
+
+            # # DEBUG - PASSED
+            # for i in range(len(Li)):
+            #     for j in [k for k in range(len(Li)) if k != i]:
+            #         for element in Li[i]:
+            #             assert element not in Li[j]
+
+            # # DEBUG - a trajectory cannot be simultaneously in the 
+            # # singlet list and also in a subproblem group - PASSED
+            # for i in traj_singlets:
+            #     for j in range(len(Ti)):
+            #         assert i not in Ti[j]
+            # for i in loc_singlets:
+            #     for j in range(len(Li)):
+            #         assert i not in Li[j]
+
             # If a trajectory does not have localizations in its 
             # search radius, set it into blink
             for ti in traj_singlets:
@@ -676,10 +754,11 @@ def track(locs, method="diffusion", search_radius=2.5,
 
                 # Otherwise, pass to the reconnection method
                 else:
+                    in_trajs = [active[i] for i in Ti[si]]
                     out_trajs = method_f([active[i] for i in Ti[si]],
                         frame_locs[Li[si],:], L, max_blinks=max_blinks,
                         pixel_size_um=pixel_size_um, frame_interval=frame_interval,
-                        **kwargs)
+                        search_radius=search_radius, **kwargs)
 
                     # Find finished trajectories
                     not_done, done = get_finished(out_trajs)

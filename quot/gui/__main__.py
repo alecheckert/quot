@@ -86,5 +86,14 @@ def attributes(locs_path, **kwargs):
     """
     launch_gui(AttributeViewer, locs_path, **kwargs)
 
+@cli.command()
+@click.argument("image_path", type=str)
+def image_viewer(image_path):
+    """
+    Simple image viewer for a TIF/ND2 movie
+
+    """
+    launch_gui(ImageViewer, image_path)
+
 if __name__ == '__main__':
     cli()
