@@ -21,6 +21,7 @@ from .detectViewer import DetectViewer
 from .spotViewer import SpotViewer 
 from .attributeViewer import AttributeViewer 
 from .trackViewer import TrackViewer 
+from .masker import Masker 
 
 class Launcher(QWidget):
     """
@@ -67,6 +68,7 @@ class Launcher(QWidget):
             ("Track viewer", self.launch_track_viewer),
             ("Batch localize", self.launch_batch_localizer),
             ("Attribute viewer", self.launch_attribute_viewer),
+            ("Simple masker", self.launch_masker),
         ]
         self.buttons = []
         for i, (label, callback) in enumerate(button_ids):
@@ -215,6 +217,25 @@ class Launcher(QWidget):
 
         # Launch an instance of AttributeViewer
         V = AttributeViewer(path, max_spots=30000, parent=self)
+
+    def launch_masker(self):
+        """
+        Launch an instance of Masker on a single file.
+
+        """
+        # Prompt the user to enter a file
+        path = getOpenFilePath(self, "Select image file to use for masking",
+            "Image files (*.tif *.tiff *.nd2)", initialdir=self.currdir)
+
+        # Check that this is a real file path
+        if not os.path.isfile(path):
+            print("path %s does not exist" % path)
+            return 
+        else:
+            self.currdir = os.path.dirname(path)
+
+        # Launch an instance of Masker
+        V = Masker(path, parent=self)
 
 def init_launcher():
     """

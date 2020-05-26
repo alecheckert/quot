@@ -21,6 +21,7 @@ from .detectViewer import DetectViewer
 from .spotViewer import SpotViewer 
 from .attributeViewer import AttributeViewer 
 from .trackViewer import TrackViewer 
+from .masker import Masker 
 
 # Custom GUI utilities
 from .guiUtils import set_dark_app
@@ -110,6 +111,15 @@ def track_viewer(image_path, locs_path, **kwargs):
 
     """
     launch_gui(TrackViewer, image_path, locs_path, **kwargs)
+
+@cli.command()
+@click.argument('image_path', type=str)
+def mask(image_path, **kwargs):
+    """
+    Draw 2D masks on an movie or image
+
+    """
+    launch_gui(Masker, image_path, **kwargs)
 
 if __name__ == '__main__':
     cli()
