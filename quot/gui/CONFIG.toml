@@ -307,3 +307,105 @@
         interval = 0.1
         init_value = 18.0
         type = "float"
+
+[track_slider_config]
+
+[track_slider_config.diffusion]
+    [track_slider_config.diffusion.search_radius]
+        name = "search_radius"
+        minimum = 0.1
+        maximum = 5.0
+        interval = 0.1
+        init_value = 2.0
+        type = "float"
+
+    [track_slider_config.diffusion.min_I0]
+        name = "min_I0"
+        minimum = 0.0
+        maximum = 1000.0
+        interval = 0.1
+        init_value = 0.0
+        type = "float"
+
+    [track_slider_config.diffusion.max_blinks]
+        name = "max_blinks"
+        minimum = 0
+        maximum = 4
+        interval = 1
+        init_value = 0
+        type = "int"
+
+    [track_slider_config.diffusion.d_max]
+        name = "d_max"
+        minimum = 0.1
+        maximum = 20.0
+        interval = 0.1
+        init_value = 5.0
+        type = "float"
+
+    [track_slider_config.diffusion.d_bound_naive]
+        name = "d_bound_naive"
+        minimum = 0.01
+        maximum = 5.0
+        interval = 0.01
+        init_value = 0.1
+        type = "float"
+
+
+[track_slider_config.conservative]
+    [track_slider_config.conservative.search_radius]
+        name = "search_radius"
+        minimum = 0.1
+        maximum = 5.0
+        interval = 0.1
+        init_value = 2.0
+        type = "float"
+
+    [track_slider_config.conservative.min_I0]
+        name = "min_I0"
+        minimum = 0.0
+        maximum = 1000.0
+        interval = 0.1
+        init_value = 0.0
+        type = "float"
+
+    [track_slider_config.conservative.max_blinks]
+        name = "max_blinks"
+        minimum = 0
+        maximum = 4
+        interval = 1
+        init_value = 0
+        type = "int"
+
+[track_slider_config.euclidean]
+    [track_slider_config.euclidean.search_radius]
+        name = "search_radius"
+        minimum = 0.1
+        maximum = 5.0
+        interval = 0.1
+        init_value = 2.0
+        type = "float"
+
+    [track_slider_config.euclidean.min_I0]
+        name = "min_I0"
+        minimum = 0.0
+        maximum = 1000.0
+        interval = 0.1
+        init_value = 0.0
+        type = "float"
+
+    [track_slider_config.euclidean.max_blinks]
+        name = "max_blinks"
+        minimum = 0
+        maximum = 4
+        interval = 1
+        init_value = 0
+        type = "int"
+
+    [track_slider_config.euclidean.scale]
+        name = "scale"
+        minimum = 0.1
+        maximum = 10.0
+        interval = 0.1
+        init_value = 1.0
+        type = "float"

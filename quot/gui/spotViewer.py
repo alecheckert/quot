@@ -201,7 +201,6 @@ class SpotViewer(QWidget):
         self.frame_slider = IntSlider(minimum=0, interval=1, 
             maximum=self.imageReader.n_frames-1, init_value=self.start_frame,
             name='Frame', parent=self.win_left)
-        #self.frame_slider.configure(init_value=self.start_frame)
         L_left.addWidget(self.frame_slider, 0, 0, rowSpan=2, 
             alignment=widget_align)
         self.frame_slider.assign_callback(self.frame_slider_callback)

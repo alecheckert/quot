@@ -312,7 +312,6 @@ class ChunkFilter(ImageReader):
 
         if not self._in_chunk(frame_index):
             self.chunk_start = self.get_chunk_start(frame_index)
-            print("loading new chunk for frame %d: chunk start %d" % (frame_index, self.chunk_start))
             self.load_chunk(self.chunk_start)
 
         return FILTER_METHODS.get(self.method)(

@@ -20,6 +20,7 @@ from .imageViewer import ImageViewer
 from .detectViewer import DetectViewer 
 from .spotViewer import SpotViewer 
 from .attributeViewer import AttributeViewer 
+from .trackViewer import TrackViewer 
 
 class Launcher(QWidget):
     """
@@ -151,7 +152,47 @@ class Launcher(QWidget):
         V = SpotViewer(image_file, path, parent=self)
 
     def launch_track_viewer(self):
-        pass 
+        """
+        Launch an instance of TrackViewer on a set of localizations
+        corresponding to one file.
+
+        """
+        # Prompt the user to enter a set of localizations
+        path = getOpenFilePath(self, "Select locs CSV",
+            "CSV files (*.csv)", initialdir=self.currdir)
+
+        # Check that this is a real file path
+        if not os.path.isfile(path):
+            print("path %s does not exist" % path)
+            return 
+        else:
+            self.currdir = os.path.dirname(path)
+
+        # Try to find the corresponding image file
+        image_file = None 
+        if "_tracks.csv" in path:
+            nd2_file = path.replace("_tracks.csv", ".nd2")
+            tif_file = path.replace("_tracks.csv", ".tif")
+            if os.path.isfile(nd2_file):
+                image_file = nd2_file
+            elif os.path.isfile(tif_file):
+                image_file = tif_file
+
+        # Otherwise prompt the user to enter the corresponding
+        # image file
+        if image_file is None:
+            image_file = getOpenFilePath(self, "Select image file", 
+                "Image files (*.nd2 *.tif *.tiff)", initialdir=self.currdir)
+        else:
+            print("Found matching image file %s" % image_file)
+
+        # Check that this path exists
+        if not os.path.isfile(image_file):
+            print("path %s does not exist" % image_file)
+            return 
+
+        # Launch an instance of TrackViewer
+        V = TrackViewer(image_file, path, parent=self)
 
     def launch_batch_localizer(self):
         pass 

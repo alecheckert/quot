@@ -20,6 +20,7 @@ from .imageViewer import ImageViewer
 from .detectViewer import DetectViewer 
 from .spotViewer import SpotViewer 
 from .attributeViewer import AttributeViewer 
+from .trackViewer import TrackViewer 
 
 # Custom GUI utilities
 from .guiUtils import set_dark_app
@@ -94,6 +95,21 @@ def image_viewer(image_path):
 
     """
     launch_gui(ImageViewer, image_path)
+
+@cli.command()
+@click.argument('image_path', type=str)
+@click.argument('locs_path', type=str)
+@click.option('-s', '--gui_size', type=int, default=600, help='default 600')
+@click.option('-p', '--pixel_size_um', type=float, default=0.16, help='default 0.16')
+@click.option('-f', '--frame_interval', type=float, default=0.00548, help='default 0.00548')
+@click.option('-f0', '--start_frame', type=int, default=0, help='default 0')
+@click.option('-f1', '--stop_frame', type=int, default=100, help='default 100')
+def track_viewer(image_path, locs_path, **kwargs):
+    """
+    Change tracking settings in real time
+
+    """
+    launch_gui(TrackViewer, image_path, locs_path, **kwargs)
 
 if __name__ == '__main__':
     cli()
