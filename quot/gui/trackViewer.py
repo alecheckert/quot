@@ -139,6 +139,10 @@ class TrackViewer(QWidget):
             self.graphItems[j].setParentItem(self.imageView.imageItem)
             self.graphItems[j].scatter.setPen(color=self.graph_colors[j], width=4.0)
 
+        # ScatterPlotItem, for occasional overlay of search radii
+        self.scatterPlotItem = ScatterPlotItem()
+        self.scatterPlotItem.setParentItem(self.imageView.imageItem)
+
         ## WIDGETS
 
         widget_align = Qt.AlignTop
@@ -168,7 +172,7 @@ class TrackViewer(QWidget):
         self.floatSliders = []
         self.n_sliders = 5
         for j in range(self.n_sliders):
-            slider = FloatSlider(parent=win_right)
+            slider = FloatSlider(parent=win_right, min_width=100)
             L_right.addWidget(slider, 2+j, 0, alignment=widget_align)
             slider.assign_callback(getattr(self, "slider_%d_callback" % j))
             self.floatSliders.append(slider)
@@ -183,6 +187,12 @@ class TrackViewer(QWidget):
         L_right.addWidget(self.B_frame_limits, 9, 0, alignment=widget_align)
         self.B_frame_limits.clicked.connect(self.B_frame_limits_callback)
 
+        # Button to toggle search radius overlay
+        self.B_search_radius_state = False 
+        self.B_search_radius = QPushButton("Show search radii", parent=win_right)
+        L_right.addWidget(self.B_search_radius, 9, 1, alignment=widget_align)
+        self.B_search_radius.clicked.connect(self.B_search_radius_callback)
+
         # overlay the first set of localizations
         self.change_track_method(self.M_method.currentText())
         self.retrack()
@@ -190,7 +200,7 @@ class TrackViewer(QWidget):
         self.update_tracks()
 
         # Resize and show GUI
-        self.win.resize(self.gui_size*1.7, self.gui_size)
+        self.win.resize(self.gui_size*2, self.gui_size)
         self.win.show()
 
     ## CORE FUNCTIONS
@@ -279,6 +289,32 @@ class TrackViewer(QWidget):
         self.tracks = np.asarray(self.locs[
             ['frame', 'trajectory', 'y', 'x', 'graph_index']
         ].sort_values(by=['trajectory', 'frame']))
+
+    def overlay_search_radii(self):
+        """
+        On top of each localization in the current frame, overlay
+        the search radii.
+
+        """
+        if self.B_search_radius_state:
+
+            # Get all localizations in the current frame
+            frame_index = self.frame_slider.value()
+            pos = self.tracks[self.tracks[:,0]==frame_index, 2:4]
+
+            if 'search_radius' in self.track_params.keys() and \
+                'pixel_size_um' in self.track_params.keys():
+                sr_pxl = self.track_params['search_radius']/self.track_params['pixel_size_um']
+                self.scatterPlotItem.setData(
+                    pos=pos, symbol='o', pxMode=False,
+                    pen={'color': '#FFFFFF', 'width': 2},
+                    size=sr_pxl*2,
+                    brush=None,
+                )
+            else:
+                self.scatterPlotItem.setData([])
+        else:
+            self.scatterPlotItem.setData([])
 
     def retrack(self):
         """
@@ -387,6 +423,7 @@ class TrackViewer(QWidget):
         frame_index = self.frame_slider.value()
         self.update_image(frame_index=frame_index)
         self.update_tracks()
+        self.overlay_search_radii()
 
     def B_overlay_callback(self):
         """
@@ -426,6 +463,11 @@ class TrackViewer(QWidget):
         self.retrack()
         self.hash_tracks()
         self.update_tracks()
+
+        # Special case: if this slider is the search radius,
+        # also change the search radius icon
+        if name == 'search_radius':
+            self.overlay_search_radii()
 
     def slider_0_callback(self):
         self.slider_callback(0)
@@ -472,6 +514,7 @@ class TrackViewer(QWidget):
         self.retrack()
         self.hash_tracks()
         self.update_tracks()
+        self.overlay_search_radii()
 
     def B_frame_limits_callback(self):
         """
@@ -509,6 +552,15 @@ class TrackViewer(QWidget):
         self.retrack()
         self.hash_tracks()
         self.update_tracks()
+        self.overlay_search_radii()
+
+    def B_search_radius_callback(self):
+        """
+        Toggle overlaying the search radius onto the raw image.
+
+        """
+        self.B_search_radius_state = not self.B_search_radius_state
+        self.overlay_search_radii()
 
 
 
