@@ -10,9 +10,6 @@ import numpy as np
 # DataFrames
 import pandas as pd 
 
-# Plotting
-import matplotlib.pyplot as plt 
-
 def traj_length(trajs):
     """
     Compute the number of localizations corresponding to 
@@ -219,18 +216,8 @@ def radial_disp_histograms(trajs, n_intervals=1, pixel_size_um=0.16,
 
     # Return the histogram and the accompanying set of bin 
     # definitions
-    print("%d total displacements" % H.sum())
     return H, bin_edges
 
-
-def plotHistograms(H, bin_edges):
-    n_intervals, n_bins = H.shape
-    bin_c = bin_edges[:-1] + (bin_edges[1]-bin_edges[0])/2.0
-    fig, ax = plt.subplots(n_intervals, 1, figsize=(3, 3*n_intervals))
-    for i in range(n_intervals):
-        ax.plot(bin_c, H[i,:], label='frame interval %d' % (i+1))
-
-    plt.show(); plt.close()
 
 
 
