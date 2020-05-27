@@ -10,6 +10,9 @@ import numpy as np
 # DataFrames
 import pandas as pd 
 
+# Plotting
+import matplotlib.pyplot as plt 
+
 def traj_length(trajs):
     """
     Compute the number of localizations corresponding to 
@@ -43,7 +46,7 @@ def traj_length(trajs):
     trajs.loc[trajs['trajectory']==-1, 'traj_len'] = 0
     return trajs  
 
-def radial_disps(trajs, pixel_size_um=0.16, first_only=True):
+def radial_disps(trajs, pixel_size_um=0.16, first_only=False):
     """
     Calculate the 2D radial displacement of each jump in every 
     trajectory.
@@ -112,4 +115,132 @@ def radial_disps(trajs, pixel_size_um=0.16, first_only=True):
     trajs['radial_disp_um'] = trajs['radial_disp_um'] * pixel_size_um 
 
     return trajs 
+
+def radial_disp_histograms(trajs, n_intervals=1, pixel_size_um=0.16,
+    first_only=True, n_gaps=0, bin_size=0.001, max_disp=5.0):
+    """
+    Calculate radial displacement histograms for a set of 
+    trajectories.
+
+    args
+    ----
+        trajs           :   pandas.DataFrame
+        n_intervals     :   int, the maximum number of frames
+                            over which to compute displacements
+        pixel_size_um   :   float, size of pixels (um)
+        first_only      :   bool, only take the displacements
+                            relative to the first point of 
+                            each trajectory
+        n_gaps          :   int, the number of gaps allowed
+                            in tracking
+        bin_size        :   float, the spatial bin size in um
+        max_disp        :   float, maximum displacement to 
+                            consider
+
+    returns
+    -------
+        (
+            2D ndarray of shape (n_intervals, n_bins), the radial
+                displacements in each bin for each interval;
+            1D ndarray of shape (n_bins+1), the edges of the
+                displacement bins in um
+        )
+
+    """
+    # Filter out localizations not assigned to a trajectory, or 
+    # trajectories that are length 1
+    trajs = traj_length(trajs)
+    T = trajs.loc[
+        (trajs['trajectory']>=0) & (trajs['traj_len']>1), 
+        :
+    ].copy()
+
+    # Add a column that indicates whether each localization is
+    # the first in the corresponding trajectory (computed later)
+    T['first_in_traj'] = 0
+
+    # Order the trajectories by ascending frame / trajectory indices.
+    # Trajectories are grouped together, and frames are ascending within
+    # each trajectory group
+    T = T.sort_values(by=['trajectory', 'frame'])
+
+    # Take only the columns we care about in an ndarray. The operations
+    # we will perform with ndarrays are much faster than their pandas
+    # dataframe equivalents
+    X = np.asarray(T[['frame', 'trajectory', 'y', 'x', 'first_in_traj']])
+
+    # Determine which localizations are the first in their respective
+    # trajectories
+    X[0,4] = 1.0 
+    X[1:,4] = ((X[1:,1] - X[:-1,1])>0).astype('float64')
+
+    # Set up the binning scheme
+    bin_edges = np.arange(0.0, max_disp+bin_size, bin_size)
+
+    # Set up the output histogram
+    H = np.zeros((n_intervals, bin_edges.shape[0]-1), dtype=np.int64)
+
+    # In order to capture every possible displacement in the presence
+    # of gaps, we need to check enough delays for the maximum interval
+    # (n_intervals) with the maximum number of gaps between every
+    # frame.
+    n_delays = n_intervals * (n_gaps+1)
+
+    for delay in range(1, n_delays+1):
+
+        # Take the displacements
+        D = X[delay:,:] - X[:-delay,:]
+
+        # We're only interested in displacements between localizations
+        # in the same trajectory
+        in_same_traj = D[:,1] == 0
+
+        # Check for displacements matching any of the desired frame
+        # intervals
+        for interval in range(1, n_intervals+1):
+
+            if first_only:
+                match = (D[:,0]==interval) & (D[:,4]==-1) & in_same_traj 
+            else:
+                match = (D[:,0]==interval) & in_same_traj 
+
+            # Check if there are any displacements that match these
+            # criteria
+            if match.sum() > 0:
+
+                # Get the radial displacements
+                disps = np.sqrt((D[match,2:4]**2).sum(axis=1)) * pixel_size_um 
+
+                # Bin these into a histogram
+                H_int, _edges = np.histogram(disps, bins=bin_edges)
+
+                # Accumulate into the histogram
+                H[interval-1,:] = H[interval-1,:] + H_int
+
+    # Return the histogram and the accompanying set of bin 
+    # definitions
+    print("%d total displacements" % H.sum())
+    return H, bin_edges
+
+
+def plotHistograms(H, bin_edges):
+    n_intervals, n_bins = H.shape
+    bin_c = bin_edges[:-1] + (bin_edges[1]-bin_edges[0])/2.0
+    fig, ax = plt.subplots(n_intervals, 1, figsize=(3, 3*n_intervals))
+    for i in range(n_intervals):
+        ax.plot(bin_c, H[i,:], label='frame interval %d' % (i+1))
+
+    plt.show(); plt.close()
+
+
+
+
+
+
+
+
+
+
+
+
 
