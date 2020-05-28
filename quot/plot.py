@@ -103,7 +103,7 @@ def wireframe_overlay(img, model, plot=True):
 
 def plotRadialDisps(radial_disps, bin_edges, frame_interval=0.00548, plot=True):
     """
-    Plot a set of radial displacement histograms.
+    Plot a set of radial displacement histograms as a simple line plot.
 
     args
     ----
@@ -139,7 +139,8 @@ def plotRadialDisps(radial_disps, bin_edges, frame_interval=0.00548, plot=True):
     n_intervals, n_bins = radial_disps.shape 
 
     # Get the centers of each bin
-    bin_c = bin_edges[:-1] + (bin_edges[1]-bin_edges[0])/2.0
+    bin_size = bin_edges[1] - bin_edges[0]
+    bin_c = bin_edges[:-1] + bin_size/2.0
 
     # Set up the plot
     fig, ax = plt.subplots(n_intervals, 1, figsize=(4, 1.5*n_intervals),
@@ -155,9 +156,92 @@ def plotRadialDisps(radial_disps, bin_edges, frame_interval=0.00548, plot=True):
         pmf = radial_disps[interval,:] / radial_disps[interval,:].sum()
 
         # Plot
-        ax[interval].plot(bin_c, pmf, color=colors[interval],
+        ax[interval].plot(bin_c, pmf*bin_size, color=colors[interval],
             linestyle='-', linewidth=1.5,
             label="%.1f ms" % (frame_interval*1000*(interval+1)))
+        ax[interval].legend(frameon=False, loc='upper right')
+
+    # Axis labels
+    ax[-1].set_xlabel("Radial displacement ($\mu$m)")
+    for j in range(len(ax)):
+        ax[j].set_ylabel("PMF")
+
+    if plot:
+        plt.show(); plt.close()
+    else:
+        return fig, ax 
+
+def plotRadialDispsBar(radial_disps, bin_edges, frame_interval=0.00548,
+    model=None, plot=True):
+    """
+    Plot a set of radial displacements as a bar graph. Also
+    overlay a model as a line plot if desired.
+
+    args
+    ----
+        radial_disps            :   2D ndarray of shape (n_intervals,
+                                    n_bins), the radial displacements
+        bin_edges               :   1D ndarray of shape (n_bins+1), bin
+                                    edge definitions
+        frame_interval          :   float, in sec
+        model                   :   2D ndarray of shape (n_intervals,
+                                    n_bins), model at each point
+        plot                    :   bool, show immediately
+
+    returns
+    -------
+        if plot:
+            None
+
+        else:
+            (
+                matplotlib.figure.Figure,
+                array of matlotlib.axes.Axes
+            )
+
+    """
+    # Check user inputs
+    if len(radial_disps.shape) == 1:
+        radial_disps = np.asarray([radial_disps])
+    assert radial_disps.shape[1] == (bin_edges.shape[0]-1)
+
+    # Check model, if using
+    if not model is None:
+        assert model.shape == radial_disps.shape
+
+    # Get the shape of the histograms
+    n_intervals, n_bins = radial_disps.shape 
+
+    # Get the centers of each bin
+    bin_size = bin_edges[1] - bin_edges[0]
+    bin_c = bin_edges[:-1] + 0.5*bin_size 
+
+    # Set up the plot
+    fig, ax = plt.subplots(n_intervals, 1, figsize=(4, 1.5*n_intervals),
+        sharex=True)
+    if n_intervals == 1:
+        ax = np.asarray([ax])
+
+    colors = hex_cmap("viridis", n_intervals*2)
+
+    for interval in range(n_intervals):
+
+        # Normalize
+        pmf = bin_size * radial_disps[interval,:] / \
+            radial_disps[interval,:].sum()
+
+        # Plot
+        ax[interval].bar(bin_c, pmf, color=colors[interval],
+            linestyle='-', linewidth=1, edgecolor='k',
+            width=bin_size*0.8,
+            label="%.1f ms" % (frame_interval*1000*(interval+1)))
+
+        # Model definition, if using
+        if not model is None:
+            ax[interval].plot(bin_c, model[interval,:], color='k',
+                linestyle='--', linewidth=1.5, label="Model")
+
+        # Legend: show the frame interval 
         ax[interval].legend(frameon=False, loc='upper right')
 
     # Axis labels

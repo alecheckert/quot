@@ -10,6 +10,11 @@ import numpy as np
 # DataFrames
 import pandas as pd 
 
+
+#########################################
+## OPERATIONS ON TRAJECTORY DATAFRAMES ##
+#########################################
+
 def traj_length(trajs):
     """
     Compute the number of localizations corresponding to 
@@ -114,7 +119,7 @@ def radial_disps(trajs, pixel_size_um=0.16, first_only=False):
     return trajs 
 
 def radial_disp_histograms(trajs, n_intervals=1, pixel_size_um=0.16,
-    first_only=True, n_gaps=0, bin_size=0.001, max_disp=5.0):
+    first_only=False, n_gaps=0, bin_size=0.001, max_disp=5.0):
     """
     Calculate radial displacement histograms for a set of 
     trajectories.
@@ -218,7 +223,25 @@ def radial_disp_histograms(trajs, n_intervals=1, pixel_size_um=0.16,
     # definitions
     return H, bin_edges
 
+def get_max_gap(trajs):
+    """
+    Return the maximum gap present in a set of trajectories.
 
+    args
+    ----
+        trajs       :   pandas.DataFrame
+
+    returns
+    -------
+        int, the maximum gap present. For instance, 1 means
+            that trajectories have no gaps (1 frame interval).
+
+    """
+    trajs = trajs.sort_values(by=['trajectory', 'frame'])
+    X = np.asarray(trajs[['frame', 'trajectory']])
+    D = X[1:,:] - X[:-1,:]
+    in_same_traj = D[:,1]==0
+    return int(D[in_same_traj, 0].max())
 
 
 
