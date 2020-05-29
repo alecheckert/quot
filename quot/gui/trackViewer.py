@@ -107,7 +107,7 @@ class TrackViewer(QWidget):
                 self.all_locs['frame']>=self.start_frame,
                 self.all_locs['frame']<=self.stop_frame,
             ), :
-        ]
+        ].copy()
         self.hash_tracks()
 
     def initUI(self):
