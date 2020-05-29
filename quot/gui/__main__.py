@@ -70,9 +70,9 @@ def detect(path, **kwargs):
 @click.argument("locs_path", type=str)
 @click.option('-f0', '--start_frame', type=int, default=0, help='default 0')
 @click.option('-s', '--gui_size', type=int, default=800, help='default 800')
-def spot_viewer(image_path, locs_path, **kwargs):
+def overlay(image_path, locs_path, **kwargs):
     """
-    Overlay localizations onto a movie.
+    Simple overlay of localizations onto a movie.
 
     """
     launch_gui(SpotViewer, image_path, locs_path, **kwargs)
@@ -90,7 +90,7 @@ def attributes(locs_path, **kwargs):
 
 @cli.command()
 @click.argument("image_path", type=str)
-def image_viewer(image_path):
+def image(image_path):
     """
     Simple image viewer for a TIF/ND2 movie
 
@@ -105,7 +105,7 @@ def image_viewer(image_path):
 @click.option('-f', '--frame_interval', type=float, default=0.00548, help='default 0.00548')
 @click.option('-f0', '--start_frame', type=int, default=0, help='default 0')
 @click.option('-f1', '--stop_frame', type=int, default=100, help='default 100')
-def track_viewer(image_path, locs_path, **kwargs):
+def track(image_path, locs_path, **kwargs):
     """
     Change tracking settings in real time
 
