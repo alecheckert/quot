@@ -651,7 +651,7 @@ class IntSlider(QWidget):
 
     """
     def __init__(self, minimum=0, maximum=10, interval=1, 
-        init_value=0, name=None, min_width=150, parent=None):
+        init_value=0, name=None, min_width=50, parent=None):
         super(IntSlider, self).__init__(parent=parent)
 
         self.minimum = int(minimum)
@@ -733,7 +733,7 @@ class IntSlider(QWidget):
         Qt overlords.
 
         """
-        return QSize(200, 100)
+        return QSize(125, 50)
 
     def _set_label_current(self):
         """

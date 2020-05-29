@@ -406,6 +406,7 @@ class AttributeViewer(QWidget):
         except ValueError:
             print("Can't generate a color scale for %s; " \
                 "try turning off log scale" % attrib)
+            return []
 
         # Scale into the available color indices
         spot_colors = self.cmap_hex[((assignments * (self.n_colors-1)) / \
