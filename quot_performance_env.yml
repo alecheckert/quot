@@ -1,4 +1,4 @@
-name: tf_vis_env
+name: quot_performance_env
 channels:
   - conda-forge
   - defaults
@@ -94,5 +94,4 @@ dependencies:
   - zstd=1.4.4=h4b3e974_3
   - pip:
     - pyqtgraph==0.11.0rc0
-prefix: /opt/anaconda3/envs/tf_vis_env
 
