@@ -16,7 +16,7 @@ A simple GUI to compare spot detection methods in single molecule tracking data.
 
 (*Alternative*: Substitute `quot_performance_env.yml` for `quot_env.yml` in the line above. Using `quot` in this environment is faster, but the environment is larger.)
 
-3. Switch to the `quot` environment:
+3. Switch to the `quot_env` (or `quot_performance_env`) environment:
 
 ```
     conda activate quot_env
