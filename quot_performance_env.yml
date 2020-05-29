@@ -54,6 +54,7 @@ dependencies:
   - nss=3.47=hc0980d9_0
   - numpy=1.18.1=py37h7241aed_0
   - numpy-base=1.18.1=py37h3304bdc_1
+  - nose2
   - olefile=0.46=py_0
   - openssl=1.1.1g=h1de35cc_0
   - opt_einsum=3.1.0=py_0
