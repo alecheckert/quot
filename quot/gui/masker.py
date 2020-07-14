@@ -18,6 +18,7 @@ import pandas as pd
 from ..read import ImageReader 
 
 # Core GUI utilities
+import PySide2
 from PySide2 import QtCore
 from PySide2.QtCore import Qt 
 from PySide2.QtWidgets import QWidget, QLabel, QPushButton, \

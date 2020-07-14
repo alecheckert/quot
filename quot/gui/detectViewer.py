@@ -25,6 +25,7 @@ from ..chunkFilter import ChunkFilter
 from ..findSpots import detect 
 
 # Core GUI utilities
+import PySide2
 from PySide2.QtCore import Qt 
 from PySide2.QtWidgets import QApplication, QWidget, QLabel, \
     QPushButton, QGridLayout, QVBoxLayout, QDialog 

@@ -4,6 +4,7 @@ SpotViewer.py -- overlay spots onto a movie after localization
 
 """
 import sys
+import PySide2
 
 # File paths
 import os 
@@ -54,7 +55,7 @@ condition_colors = ['#FF5454', '#2DA8FF']
 # Custom overlay symbols a little
 SPI_base.Symbols['+'] = Symbols['alt +']
 SPI_base.Symbols['open +'] = Symbols['open +']
-symbol_sizes = {'+': 16.0, 'o': 16.0, 'open +': 20.0}
+symbol_sizes = {'+': 12.0, 'o': 8.0, 'open +': 12.0}
 
 class SpotViewer(QWidget):
     """
@@ -333,7 +334,7 @@ class SpotViewer(QWidget):
 
             # Overlay the spots
             if color_by == "None":
-                self.scatterPlotItem.setData(pos=self.locs_pos+0.5,
+                self.scatterPlotItem.setData(pos=self.locs_pos+1.5,
                     data=self.locs_data, symbol=symbol, 
                     size=symbol_sizes[symbol], **overlay_params)
             elif color_by == "Trajectory":

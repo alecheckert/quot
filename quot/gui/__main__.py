@@ -12,6 +12,7 @@ import os
 import click 
 
 # Core QApplication instance
+import PySide2
 from PySide2.QtWidgets import QApplication
 
 # GUIs

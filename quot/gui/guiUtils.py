@@ -12,6 +12,7 @@ import os
 import numpy as np 
 
 # Main GUI utilities
+import PySide2
 from PySide2.QtCore import Qt, QSize, QRectF
 from PySide2.QtGui import QPalette, QColor, QPainterPath
 from PySide2.QtWidgets import QFileDialog, QSlider, QWidget, \

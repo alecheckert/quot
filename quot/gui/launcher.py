@@ -10,6 +10,7 @@ import sys
 import os 
 
 # Main GUI utilities
+import PySide2
 from PySide2.QtCore import Qt 
 from PySide2.QtWidgets import QApplication, QWidget, QLabel, \
     QPushButton, QVBoxLayout

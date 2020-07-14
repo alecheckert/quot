@@ -5,6 +5,7 @@ settings in real-time
 
 """
 import sys
+import PySide2
 
 # File paths
 import os
@@ -219,14 +220,14 @@ class TrackViewer(QWidget):
         """
         if reset:
             method = self.M_method.currentText()
+            for k in [j for j in TRACK_SLIDER_CONFIG[method].keys() if j not in kwargs.keys()]:
+                kwargs[k] = TRACK_SLIDER_CONFIG[method][k]['init_value']
             self.track_params = {
                 'method': method,
                 'pixel_size_um': self.pixel_size_um,
                 'frame_interval': self.frame_interval,
                 **kwargs
             }
-            for k in [j for j in TRACK_SLIDER_CONFIG[method].keys() if j not in kwargs.keys()]:
-                kwargs[k] = TRACK_SLIDER_CONFIG[method][k]['init_value']
         else:
             for k in kwargs.keys():
                 self.track_params[k] = kwargs[k]
