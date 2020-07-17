@@ -388,7 +388,7 @@ localize = assign_methods(METHODS)(lambda I, **kwargs: None)
 # Wrapper for all localization methods on a frame
 # with several detections.
 def localize_frame(img, positions, method=None, window_size=9,
-    **method_kwargs):
+    camera_bg=0.0, camera_gain=1.0, **method_kwargs):
     """
     Run localization on multiple spots in a large 2D image,
     returning the result as a pandas DataFrame.
@@ -401,6 +401,8 @@ def localize_frame(img, positions, method=None, window_size=9,
                         localize spots
         method      :   str, a method in METHODS
         window_size :   int, the fitting window size
+        camera_bg   :   float, the BG per subpixel in the camera
+        camera_gain :   float, the camera gain (grayvalues/photon)
         method_kwargs:  to the localization method
 
     returns
@@ -427,10 +429,10 @@ def localize_frame(img, positions, method=None, window_size=9,
 
         # Localize a PSF in a subwindow of the image
         def localize_subwindow(yd, xd):
-            r = method_f(
-                img[yd-hw:yd+hw+1, xd-hw:xd+hw+1],
-                **method_kwargs
-            )
+            psf_img = np.clip(
+                img[yd-hw:yd+hw+1, xd-hw:xd+hw+1]-camera_bg, 0, np.inf
+            ) / camera_gain 
+            r = method_f(psf_img, **method_kwargs)
             r.update({"y_detect": yd, "x_detect": xd})
             r['y'] = r['y'] + yd - hw 
             r['x'] = r['x'] + xd - hw 
