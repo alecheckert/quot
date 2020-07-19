@@ -334,7 +334,7 @@ class SpotViewer(QWidget):
 
             # Overlay the spots
             if color_by == "None":
-                self.scatterPlotItem.setData(pos=self.locs_pos+1.5,
+                self.scatterPlotItem.setData(pos=self.locs_pos+0.5,
                     data=self.locs_data, symbol=symbol, 
                     size=symbol_sizes[symbol], **overlay_params)
             elif color_by == "Trajectory":

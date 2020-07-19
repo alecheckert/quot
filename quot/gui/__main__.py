@@ -3,17 +3,17 @@
 __main__.py
 
 """
-import sys 
+# Core GUI utilities
+import PySide2
+from PySide2.QtWidgets import QApplication
+import pyqtgraph
 
 # Paths
+import sys
 import os 
 
 # CLI
 import click 
-
-# Core QApplication instance
-import PySide2
-from PySide2.QtWidgets import QApplication
 
 # GUIs
 from .launcher import Launcher 
@@ -37,6 +37,7 @@ def launch_gui(gui, *args, **kwargs):
         gui     :   GUI to launch
 
     """
+    pyqtgraph.Qt.QT_LIB = "PySide2"
     app = QApplication([])
     set_dark_app(app)
     instance = gui(*args, **kwargs)
