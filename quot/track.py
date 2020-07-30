@@ -638,6 +638,12 @@ def track(locs, method="diffusion", search_radius=2.5,
             **kwargs
         )
 
+    # If passed an empty dataframe, do nothing
+    if locs.empty:
+        for c in ["trajectory", "subproblem_n_locs", "subproblem_n_traj"]:
+            locs[c] = []
+        return locs 
+
     # Determine frame limits for tracking
     start_frame = int(locs['frame'].min())
     stop_frame = int(locs['frame'].max())+1
@@ -834,9 +840,9 @@ def track(locs, method="diffusion", search_radius=2.5,
 
     # If desired, return the Trajectory objects for testing
     if debug:
-        return locs, completed 
+        return locs, completed
     else:
-        return locs 
+        return locs
 
 def track_subset(locs, filters, **kwargs):
     """
