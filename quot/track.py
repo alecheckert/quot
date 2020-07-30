@@ -24,6 +24,9 @@ from .helper import (
 # Deep copy
 from copy import copy 
 
+# Filter on the number of spots per frame
+from .trajUtils import filter_on_spots_per_frame 
+
 ##################################
 ## LOW-LEVEL TRACKING UTILITIES ##
 ##################################
@@ -566,13 +569,13 @@ METHODS = {
     'euclidean': reconnect_euclidean
 }
 
-############################
-## MAIN TRACKING FUNCTION ##
-############################
+#############################
+## MAIN TRACKING FUNCTIONS ##
+#############################
 
 def track(locs, method="diffusion", search_radius=2.5, 
     pixel_size_um=0.16, frame_interval=0.00548, min_I0=0.0,
-    max_blinks=0, debug=False, **kwargs):
+    max_blinks=0, debug=False, max_spots_per_frame=None, **kwargs):
     """
     Given a dataframe with localizations, reconnect into 
     trajectories.
@@ -597,12 +600,45 @@ def track(locs, method="diffusion", search_radius=2.5,
     args
     ----
         locs            :   pandas.DataFrame, set of localizations
+        method          :   str, the tracking method. Currently either
+                            "diffusion", "euclidean", or "conservative"
+        search_radius   :   float, max jump length in um
+        pixel_size_um   :   float, um per pixel
+        frame_interval  :   float, seconds
+        min_I0          :   float, only track spots with at least this
+                            intensity
+        max_blinks      :   int, number of gaps allowed
+        debug           :   bool
+        max_spots_per_frame
+                        :   int, don't track in frames with more than 
+                            this number of spots
+        **kwargs        :   additional keyword arguments to the tracking
+                            method
 
     returns
     -------
         pandas.Series, trajectory indices for each localization.
 
     """
+    # Filter on the number of spots per frame, if desired
+    if not max_spots_per_frame is None:
+        return track_subset(
+            locs, 
+            [lambda T: filter_on_spots_per_frame(
+                T,
+                max_spots_per_frame=max_spots_per_frame,
+                filter_kernel=21)],
+            method=method,
+            search_radius=search_radius, 
+            pixel_size_um=pixel_size_um,
+            frame_interval=frame_interval,
+            min_I0=min_I0,
+            max_blinks=max_blinks,
+            debug=debug,
+            **kwargs
+        )
+
+    # Determine frame limits for tracking
     start_frame = int(locs['frame'].min())
     stop_frame = int(locs['frame'].max())+1
 
@@ -801,4 +837,56 @@ def track(locs, method="diffusion", search_radius=2.5,
         return locs, completed 
     else:
         return locs 
+
+def track_subset(locs, filters, **kwargs):
+    """
+    Run tracking on a subset of trajectories - for instance,
+    only on localizations in frames that meet a particular
+    criterion.
+
+    *filters* should be a set of functions that take trajectory
+    dataframes as argument and return a boolean pandas.Series 
+    indicating whether each localization passed or failed the 
+    criterion.
+
+    Example for the *filters* argument:
+
+        filters = [
+            lambda locs: filter_on_spots_per_frame(
+                locs,
+                max_spots_per_frame=3,
+                filter_kernel=21
+            )
+        ]
+
+    This would only track localizations belonging to frames with 
+    3 or fewer total localizations in that frame. (After smoothing
+    with a uniform kernel of width 21 frames, that is.)
+
+    Parameters
+    ----------
+        locs            :   pandas.DataFrame, localizations
+        filters         :   list of functions, the filters
+        kwargs          :   keyword arguments to the tracking method
+
+    Returns
+    -------
+        pandas.DataFrame, trajectories
+
+    """
+    # Determine which localizations pass the QC filters
+    filter_pass = np.ones(len(locs), dtype=np.bool)
+    for f in filters:
+        filter_pass = np.logical_and(filter_pass, f(locs))
+
+    # Track the subset of localizations that pass QC filters
+    L = locs[filter_pass].copy()
+    L = track(L, **kwargs)
+
+    # Join the results with the original dataframe
+    for c in [j for j in L.columns if j not in locs.columns]:
+        locs[c] = L[c]
+        locs[c] = (locs[c].fillna(-1)).astype(np.int64)
+
+    return locs 
 

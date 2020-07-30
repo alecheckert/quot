@@ -7,6 +7,9 @@ trajectories
 # Numeric
 import numpy as np 
 
+# Uniform filter
+from scipy.ndimage import uniform_filter 
+
 # DataFrames
 import pandas as pd 
 
@@ -242,6 +245,84 @@ def get_max_gap(trajs):
     D = X[1:,:] - X[:-1,:]
     in_same_traj = D[:,1]==0
     return int(D[in_same_traj, 0].max())
+
+def get_spots_per_frame(trajs):
+    """
+    Return the number of spots per frame.
+
+    Parameters
+    ----------
+        trajs       :   pandas.DataFrame, localizations
+
+    Returns
+    -------
+        pandas.DataFrame, indexed by frame between 0 
+            and the max frame index in *trajs*. The 
+            column encoding the number of spots per 
+            frame is "n_spots_per_frame".
+
+    """
+    if trajs.empty:
+        return pd.DataFrame([], columns=["n_spots_per_frame"])
+    result = pd.DataFrame(
+        index=pd.Series(np.arange(0, trajs['frame'].max()+1)),
+        columns=["n_spots_per_frame"]
+    )
+
+    # Calculate the number of spots per frame
+    result["n_spots_per_frame"] = trajs.groupby("frame").size()
+
+    # Account for frames that do not exist in the input dataframe
+    result["n_spots_per_frame"] = result["n_spots_per_frame"].fillna(0)
+
+    # Format as 64-bit integer
+    result["n_spots_per_frame"] = result["n_spots_per_frame"].astype(np.int64)
+    return result 
+
+def filter_on_spots_per_frame(trajs, max_spots_per_frame=10,
+    filter_kernel=21):
+    """
+    Mask a set of localizations by the total number of localizations
+    in the corresponding frame.
+
+    This function does the following:
+        1. Take a set of localizations.
+        2. Calculate the number of localizations in each frame.
+        3. Smooth this signal with a uniform kernel of size 
+            *filter_kernel*.
+        4. Get the set of frames with total # of spots below
+            *max_spots_per_frame*.
+        5. Mark each localization in these frames with *True*,
+            and otherwise with *False*.
+
+    args
+    ----
+        trajs               :   pandas.DataFrame, localizations
+        max_spots_per_frame :   int, the maximum number of spots
+                                tolerated per frame
+        filter_kernel       :   int, the size of the smoothing
+                                kernel. If *None*, no smoothing is
+                                performed.
+
+    returns
+    -------
+        pandas.Series with index *trajs.index*. True if the 
+            corresponding localization passed the filter.
+
+    """
+    # Calculate the number of spots per frame
+    spots_per_frame = get_spots_per_frame(trajs)
+
+    # Smooth the signal, if desired
+    if not filter_kernel is None:
+        spots_per_frame = uniform_filter(
+            spots_per_frame.astype(np.float64),
+            filter_kernel
+        )
+
+    # Get the set of frames that pass the filter
+    acceptable = (spots_per_frame <= max_spots_per_frame).nonzero()[0]
+    return trajs["frame"].isin(acceptable)
 
 
 
