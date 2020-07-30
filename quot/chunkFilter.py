@@ -354,7 +354,7 @@ def simple_sub(img, sub_img, scale=1.0):
         2D ndarray (YX)
 
     """
-    return np.clip(img-scale*sub_img, 0.0, np.inf)
+    return img - scale * sub_img 
 
 def sub_min(img, min_img, scale=1.0):
     """
