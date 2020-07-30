@@ -135,5 +135,6 @@ def track_directory(path, ext='.nd2', verbose=True,
 
     # Run pipeline on each file
     for path, out_csv in zip(image_paths, out_csvs):
+        if verbose: print("Working on file %s..." % path)
         trajs = track_file(path, out_csv=out_csv, **kwargs)
         if verbose: print("Finished with file %s..." % path)
