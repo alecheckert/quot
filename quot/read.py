@@ -308,10 +308,13 @@ class ImageReader(object):
         M = kwargs['x1'] - kwargs['x0']
         result = np.empty((T, N, M), dtype=self.dtype)
         for j, frame_index in enumerate(range(kwargs['start'], kwargs['stop'])):
-            result[j,:,:] = self.get_frame(frame_index)[
-                kwargs['y0']:kwargs['y1'],
-                kwargs['x0']:kwargs['x1']
-            ]
+            try:
+                result[j,:,:] = self.get_frame(frame_index)[
+                    kwargs['y0']:kwargs['y1'],
+                    kwargs['x0']:kwargs['x1']
+                ]
+            except:
+                result[j,:,:] = 0 
         return result 
 
     def max_int_proj(self, **kwargs):
