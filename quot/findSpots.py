@@ -525,6 +525,53 @@ def hess_det(I, k=1.0, t=200.0, return_filt=False):
 
     return threshold_image(doh, t=t, return_filt=return_filt)
 
+def hess_det_broad(I, k=1.0, t=200.0, return_filt=False):
+    """
+    Use the local Hessian determinant of the image as the 
+    criterion for detection. The Hessian determinant is related
+    to the "spot-ness" of an image and is generally a better
+    criterion for detection than the Laplacian alone (as in LoG
+    filtering).
+
+    args
+    ----
+        frame       :   2D ndarray
+        k           :   float, Gaussian filtering kernel size
+        t           :   float, threshold for detection
+        return_filt :   bool
+
+    returns
+    -------
+        If *return_filt*:
+            (
+                2D ndarray, filtered image;
+                2D ndarray, binary image;
+                pandas.DataFrame, the detections
+            )
+        else:
+            pandas.DataFrame, the detections
+
+    """
+    # Gaussian filter
+    I_filt = ndi.gaussian_filter(I, k)
+
+    def derivative2(im, axis, output, mode, cval):
+        return ndi.correlate1d(im, [9, 28, -6, -62, -6, 28, 9], axis, output, mode, cval, 0)
+
+    # Discrete second derivative in the y direction
+    Lyy = derivative2(I_filt, 0, None, "reflect", 0.0) / 12.0
+
+    # Discrete second derivative in the x direction
+    Lxx = derivative2(I_filt, 1, None, "reflect", 0.0) / 12.0
+
+    # Laplacian
+    Lxy = (Lyy + Lxx) / 12.0
+
+    # Hessian determinant
+    doh = (k**4) * (Lyy * Lxx - Lxy**2)
+
+    return threshold_image(doh, t=t, return_filt=return_filt)
+
 def llr_rect(I, w0=3, w1=11, t=20.0, return_filt=False):
     """
     Perform a log-likelihood ratio test for the presence of 
@@ -595,6 +642,7 @@ METHODS = {
     'gauss_filt_min_max': gauss_filt_min_max,
     'llr': llr,
     'hess_det': hess_det,
+    'hess_det_broad': hess_det_broad,
     'llr_rect': llr_rect,
 }
 
