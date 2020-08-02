@@ -285,6 +285,22 @@
         init_value = 18.0
         type = "float"
 
+[detect_slider_config.hess_det]
+    [detect_slider_config.hess_det.k]
+        name = "k"
+        minimum = 0.1
+        maximum = 7.0
+        interval = 0.1
+        init_value = 1.0
+        type = "float"
+    [detect_slider_config.hess_det.t]
+        name = "t"
+        minimum = 0.0
+        maximum = 10000.0
+        interval = 0.1
+        init_value = 5000.0
+        type = "float"
+
 [detect_slider_config.llr_rect]
     [detect_slider_config.llr_rect.w0]
         name = "w0"
