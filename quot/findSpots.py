@@ -481,7 +481,10 @@ def llr(I, k=1.0, w=9, t=20.0, return_filt=False):
 def hess_det(I, k=1.0, t=200.0, return_filt=False):
     """
     Use the local Hessian determinant of the image as the 
-    criterion for detection.
+    criterion for detection. The Hessian determinant is related
+    to the "spot-ness" of an image and is generally a better
+    criterion for detection than the Laplacian alone (as in LoG
+    filtering).
 
     args
     ----
@@ -508,16 +511,13 @@ def hess_det(I, k=1.0, t=200.0, return_filt=False):
     def derivative2(im, axis, output, mode, cval):
         return ndi.correlate1d(im, [-1, 16, -30, 16, -1], axis, output, mode, cval, 0)
 
-    def laplace(im):
-        return ndi.generic_laplace(im, derivative2, None, "reflect", 0.0)
-
     # Discrete second derivative in the y direction
     Lyy = derivative2(I_filt, 0, None, "reflect", 0.0) / 12.0
 
     # Discrete second derivative in the x direction
     Lxx = derivative2(I_filt, 1, None, "reflect", 0.0) / 12.0
 
-    # Lxy 
+    # Laplacian
     Lxy = (Lyy + Lxx) / 12.0
 
     # Hessian determinant
