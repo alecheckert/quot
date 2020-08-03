@@ -378,8 +378,6 @@ def min_max(I, w=9, t=200.0, mode='constant', return_filt=False,
     """
     size = (w, w)
     I_filt = I - ndi.minimum_filter(I, size=size, mode=mode, **kwargs)
-    # I_filt = ndi.maximum_filter(I, size=size, mode=mode, **kwargs) - \
-    #     ndi.minimum_filter(I, size=size, mode=mode, **kwargs)
 
     # Set the probability of detection near the border to zero
     hw = w//2
