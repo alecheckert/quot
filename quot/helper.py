@@ -183,7 +183,7 @@ def label_spots(binary_img, intensity_img=None, mode="max"):
 
     """
     # Find and label every nonzero object
-    img_lab, n = ndi.label(binary_img)
+    img_lab, n = ndi.label(binary_img, structure=np.array([[1, 1, 1], [1, 1, 1], [1, 1, 1]]))
     index = np.arange(1, n + 1)
 
     # Find the centers of the spots
@@ -234,7 +234,50 @@ def threshold_image(I, t=200.0, return_filt=False, mode='max'):
     if return_filt:
         return I, I_bin, pos 
     else:
-        return pos 
+        return pos
+
+def hollow_box_var(I, w0=15, w1=9):
+    """
+    Calculate the local variance of every point in a 2D image,
+    returning another 2D image composed of the variances.
+
+    Variances are calculated in a "hollow box" region around
+    each point. The box is a square kernel of width *w0*; the
+    hollow central region is width *w1*.
+
+    For instance, if w0 = 5 and w1 = 3, the kernel would be
+
+            1   1   1   1   1
+            1   0   0   0   1
+            1   0   0   0   1
+            1   0   0   0   1
+            1   1   1   1   1
+
+    args
+    ----
+        I       :   2D ndarray, image
+        w0      :   int, width of the kernel
+        w1      :   int, width of central region
+
+    returns
+    -------
+        2D ndarray
+
+    """
+    # Make the hollow box kernel
+    hw0 = w0 // 2
+    hw1 = w1 // 2
+    kernel = np.ones((w0, w0), dtype='float64')
+    kernel[hw0-hw1:hw0+hw1+1, hw0-hw1:hw0+hw1+1] = 0
+    kernel = kernel / kernel.sum()
+
+    # Calculate variance
+    kernel_rft = np.fft.rfft2(pad(kernel, *I.shape))
+    I_mean = np.fft.fftshift(np.fft.irfft2(np.fft.rfft2(I) * kernel_rft, s=I.shape))
+    I2_mean = np.fft.fftshift(np.fft.irfft2(np.fft.rfft2(I**2) * kernel_rft, s=I.shape))
+    return I2_mean - (I_mean**2)
+
+
 
 ###########################
 ## SUBPIXEL LOCALIZATION ##

@@ -21,6 +21,7 @@ from .helper import (
     threshold_image,
     stable_divide_array,
     assign_methods,
+    hollow_box_var
 )
 
 def gauss(I, k=1.0, w=9, t=200.0, return_filt=False):
@@ -525,19 +526,84 @@ def hess_det(I, k=1.0, t=200.0, return_filt=False):
 
     return threshold_image(doh, t=t, return_filt=return_filt)
 
-def hess_det_broad(I, k=1.0, t=200.0, return_filt=False):
+def hess_det_var(I, k=1.0, t=200.0, w0=15, w1=9, return_filt=False):
     """
-    Use the local Hessian determinant of the image as the 
-    criterion for detection. The Hessian determinant is related
-    to the "spot-ness" of an image and is generally a better
-    criterion for detection than the Laplacian alone (as in LoG
-    filtering).
+    Similar to hess_det, this uses the local Hessian determinant 
+    of the image as the criterion for spot detection. However, it 
+    normalizes the Hessian by its local variance in a hollow ring
+    around each point (see quot.helper.hollow_box_var). This endows
+    it with a kind of invariance with respect to the absolute 
+    intensity of the image, resulting in more consistent threshold
+    arguments.
 
     args
     ----
         frame       :   2D ndarray
         k           :   float, Gaussian filtering kernel size
         t           :   float, threshold for detection
+        w0          :   int, width of the box around each point
+                        in which to calculate the variance
+        w1          :   int, width of the hollow subregion inside
+                        each box to exclude from variance calculations
+        return_filt :   bool
+
+    returns
+    -------
+        If *return_filt*:
+            (
+                2D ndarray, filtered image;
+                2D ndarray, binary image;
+                pandas.DataFrame, the detections
+            )
+        else:
+            pandas.DataFrame, the detections
+
+    """
+    # Gaussian filter
+    I_filt = ndi.gaussian_filter(I, k)
+
+    def derivative2(im, axis, output, mode, cval):
+        return ndi.correlate1d(im, [-1, 16, -30, 16, -1], axis, output, mode, cval, 0)
+
+    # Discrete second derivative in the y direction
+    Lyy = derivative2(I_filt, 0, None, "reflect", 0.0) / 12.0
+
+    # Discrete second derivative in the x direction
+    Lxx = derivative2(I_filt, 1, None, "reflect", 0.0) / 12.0
+
+    # Laplacian
+    Lxy = (Lyy + Lxx) / 12.0
+
+    # Hessian determinant
+    doh = (k**4) * (Lyy * Lxx - Lxy**2)
+
+    # Local variance in the Hessian determinant
+    doh_var = hollow_box_var(doh, w0=w0, w1=w1)
+    doh = doh / np.sqrt(doh_var)
+
+    return threshold_image(doh, t=t, return_filt=return_filt)
+
+def hess_det_broad_var(I, k=1.0, t=200.0, w0=15, w1=9, return_filt=False):
+    """
+    Use the local Hessian determinant of the image as the 
+    criterion for detection. This method uses a broader definition
+    of the Laplacian kernel than hess_det() or hess_det_var().
+
+    This method also normalizes the Hessian determinant against
+    its local variance to give it the property of intensity
+    invariance. Otherwise, the broader Laplacian kernel tends
+    to produce quite different threshold values for different
+    cameras.
+
+    args
+    ----
+        frame       :   2D ndarray
+        k           :   float, Gaussian filtering kernel size
+        t           :   float, threshold for detection
+        w0          :   int, width of the box around each point
+                        in which to calculate the variance
+        w1          :   int, width of the hollow subregion inside
+                        each box to exclude from variance calculations
         return_filt :   bool
 
     returns
@@ -569,6 +635,10 @@ def hess_det_broad(I, k=1.0, t=200.0, return_filt=False):
 
     # Hessian determinant
     doh = (k**4) * (Lyy * Lxx - Lxy**2)
+
+    # Normalize by the local variance in the Hessian determinant
+    doh_var = hollow_box_var(doh, w0=w0, w1=w1)
+    doh = doh / np.sqrt(doh_var)
 
     return threshold_image(doh, t=t, return_filt=return_filt)
 
@@ -642,7 +712,8 @@ METHODS = {
     'gauss_filt_min_max': gauss_filt_min_max,
     'llr': llr,
     'hess_det': hess_det,
-    'hess_det_broad': hess_det_broad,
+    'hess_det_var': hess_det_var,
+    'hess_det_broad_var': hess_det_broad_var,
     'llr_rect': llr_rect,
 }
 

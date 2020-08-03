@@ -301,21 +301,65 @@
         init_value = 5000.0
         type = "float"
 
-# [detect_slider_config.hess_det_broad]
-#     [detect_slider_config.hess_det_broad.k]
-#         name = "k"
-#         minimum = 0.1
-#         maximum = 7.0
-#         interval = 0.1
-#         init_value = 1.0
-#         type = "float"
-#     [detect_slider_config.hess_det_broad.t]
-#         name = "t"
-#         minimum = 0.0
-#         maximum = 10000.0
-#         interval = 0.1
-#         init_value = 5000.0
-#         type = "float"
+[detect_slider_config.hess_det_var]
+    [detect_slider_config.hess_det_var.k]
+        name = "k"
+        minimum = 0.1
+        maximum = 7.0
+        interval = 0.1
+        init_value = 1.0
+        type = "float"
+    [detect_slider_config.hess_det_var.t]
+        name = "t"
+        minimum = 0.0
+        maximum = 10000.0
+        interval = 0.1
+        init_value = 5000.0
+        type = "float"
+    [detect_slider_config.hess_det_var.w0]
+        name = "w0"
+        minimum = 5
+        maximum = 21
+        interval = 1
+        init_value = 15
+        type = "int"
+    [detect_slider_config.hess_det_var.w1]
+        name = "w1"
+        minimum = 3
+        maximum = 15
+        interval = 1
+        init_value = 9
+        type = "int"
+
+[detect_slider_config.hess_det_broad_var]
+    [detect_slider_config.hess_det_broad_var.k]
+        name = "k"
+        minimum = 0.1
+        maximum = 7.0
+        interval = 0.1
+        init_value = 1.0
+        type = "float"
+    [detect_slider_config.hess_det_broad_var.t]
+        name = "t"
+        minimum = 0.0
+        maximum = 10000.0
+        interval = 0.1
+        init_value = 5000.0
+        type = "float"
+    [detect_slider_config.hess_det_broad_var.w0]
+        name = "w0"
+        minimum = 5
+        maximum = 21
+        interval = 1
+        init_value = 15
+        type = "int"
+    [detect_slider_config.hess_det_broad_var.w1]
+        name = "w1"
+        minimum = 3
+        maximum = 15
+        interval = 1
+        init_value = 9
+        type = "int"
 
 [detect_slider_config.llr_rect]
     [detect_slider_config.llr_rect.w0]
