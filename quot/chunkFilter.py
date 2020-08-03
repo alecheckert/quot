@@ -79,6 +79,11 @@ class ChunkFilter(ImageReader):
         self.method_static = method_static 
         self.method_kwargs = method_kwargs 
 
+        # If the chunk size is larger than the number of frames,
+        # set it to the number of frames
+        if self.chunk_size > self.n_frames:
+            self.chunk_size = self.n_frames
+
         # Initially, set no subregion on the image.
         self.sub_kwargs = {}
 
