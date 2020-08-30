@@ -23,6 +23,7 @@ from .spotViewer import SpotViewer
 from .attributeViewer import AttributeViewer 
 from .trackViewer import TrackViewer 
 from .masker import Masker 
+from .maskInterpolator import MaskInterpolator
 
 class Launcher(QWidget):
     """
@@ -70,6 +71,7 @@ class Launcher(QWidget):
             ("Batch localize", self.launch_batch_localizer),
             ("Attribute viewer", self.launch_attribute_viewer),
             ("Simple masker", self.launch_masker),
+            ("Mask interpolator", self.launch_mask_interpolator)
         ]
         self.buttons = []
         for i, (label, callback) in enumerate(button_ids):
@@ -237,6 +239,13 @@ class Launcher(QWidget):
 
         # Launch an instance of Masker
         V = Masker(path, parent=self)
+
+    def launch_mask_interpolator(self):
+        """
+        Launch an instance of MaskInterpolator.
+
+        """
+        V = MaskInterpolator(parent=self)
 
 def init_launcher():
     """

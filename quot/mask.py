@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 from matplotlib.path import Path 
 from scipy import interpolate 
 from scipy.spatial import distance_matrix 
+from tqdm import tqdm 
 
 class MaskInterpolator(object):
     """
@@ -68,6 +69,7 @@ class MaskInterpolator(object):
         self.interp_kind = interp_kind
         self.n_frames = len(self.mask_frames)
         self.n_vertices = n_vertices 
+        self.plot = plot 
 
         # If passed only a single frame, then the interpolator
         # always returns a simple static 2D shape
@@ -79,7 +81,7 @@ class MaskInterpolator(object):
             self._generate_mask_matches()
             self._generate_interpolators()
 
-    def __call__(self, points, frame_indices):
+    def __call__(self, points, frame_indices, progress_bar=False):
         """
         Given a set of points, determine whether each point lies inside
         or outside the present mask.
@@ -90,6 +92,7 @@ class MaskInterpolator(object):
                                 YX coordinates for each point
             frame_indices   :   1D ndarray of shape (n_points,), the 
                                 frame indices corresponding to each point
+            progress_bar    :   bool, show a progress bar
 
         returns
         -------
@@ -105,8 +108,10 @@ class MaskInterpolator(object):
             frame_indices = np.asarray(frame_indices)
 
         unique_frames = np.unique(frame_indices)
+        if progress_bar:
+            unique_frames = tqdm(unique_frames)
         assignments = np.empty(points.shape[0])
-        for frame_index in np.unique(frame_indices):
+        for frame_index in unique_frames:
             mask = Path(self.interpolate(frame_index), closed=True)
             in_frame = frame_indices == frame_index 
             assignments[in_frame] = mask.contains_points(points[in_frame,:])
@@ -181,7 +186,7 @@ class MaskInterpolator(object):
                 result[:,j-1,:],
                 self.mask_edges[j],
                 method="global",
-                plot=True
+                plot=self.plot
             )
 
         self.mask_edges = result 
@@ -386,7 +391,7 @@ def match_vertices(vertices_0, vertices_1, method="closest", plot=False):
                 color="k", linestyle='-')
         ax.set_aspect('equal')
         ax.set_title("Mask alignment")
-        plt.show(); plt.close()
+        plt.show()
 
     return vertices_1 
 

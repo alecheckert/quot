@@ -23,6 +23,7 @@ from .spotViewer import SpotViewer
 from .attributeViewer import AttributeViewer 
 from .trackViewer import TrackViewer 
 from .masker import Masker 
+from .maskInterpolator import MaskInterpolator
 
 # Custom GUI utilities
 from .guiUtils import set_dark_app
@@ -122,6 +123,14 @@ def mask(image_path, **kwargs):
 
     """
     launch_gui(Masker, image_path, **kwargs)
+
+@cli.command()
+def mask_interpolator(**kwargs):
+    """
+    Draw 2D masks on a movie or image, interpolating masks between frames
+
+    """
+    launch_gui(MaskInterpolator, **kwargs)
 
 if __name__ == '__main__':
     cli()

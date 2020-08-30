@@ -33,7 +33,7 @@ import PySide2
 from PySide2 import QtCore
 from PySide2.QtCore import Qt 
 from PySide2.QtWidgets import QWidget, QLabel, QPushButton, \
-    QVBoxLayout, QGridLayout
+    QVBoxLayout, QGridLayout, QDialog 
 
 # pyqtgraph plotting utilities
 from pyqtgraph import ImageView, ScatterPlotItem, PolyLineROI
@@ -46,7 +46,7 @@ from .guiUtils import (
     getTextInputs
 )
 
-class Masker(QWidget):
+class Masker(QDialog):
     """
     An interface for the user to draw masks on an image or movie.
     This includes:
@@ -68,10 +68,12 @@ class Masker(QWidget):
 
 
     """
-    def __init__(self, image_path, max_points_freestyle=20, parent=None):
+    def __init__(self, image_path, max_points_freestyle=20, dialog_mode=False, parent=None):
+
         super(Masker, self).__init__(parent=parent)
         self.image_path = image_path 
         self.max_points_freestyle = max_points_freestyle
+        self.dialog_mode = dialog_mode 
         self.initData()
         self.initUI()
 
@@ -92,11 +94,10 @@ class Masker(QWidget):
 
         """
         # Main layout
-        self.win = QWidget()
-        L_master = QGridLayout(self.win)
+        L_master = QGridLayout(self)
 
         # An ImageView on the left to contain the subject of masking
-        self.imageView = ImageView(parent=self.win)
+        self.imageView = ImageView(parent=self)
         L_master.addWidget(self.imageView, 0, 0, 15, 2)
         self.imageView.setImage(self.image)
 
@@ -127,7 +128,7 @@ class Masker(QWidget):
             interval=1,
             init_value=0,
             name='Frame',
-            parent=self.win
+            parent=self
         )
         L_master.addWidget(self.frame_slider, 0, 2, 1, 1,
             alignment=widget_align)
@@ -135,39 +136,52 @@ class Masker(QWidget):
 
         # Button: create new ROI
         self.create_roi_mode = False 
-        self.B_create_ROI = QPushButton("Draw ROI", parent=self.win)
+        self.B_create_ROI = QPushButton("Draw ROI", parent=self)
         self.B_create_ROI.clicked.connect(self.B_create_ROI_callback)
         L_master.addWidget(self.B_create_ROI, 10, 2, 1, 1, 
             alignment=widget_align)
 
         # Button: freestyle drawing to make ROI
         self.freestyle_mode = False 
-        self.B_freestyle = QPushButton("Freestyle", parent=self.win)
+        self.B_freestyle = QPushButton("Freestyle", parent=self)
         self.B_freestyle.clicked.connect(self.B_freestyle_callback)
         L_master.addWidget(self.B_freestyle, 11, 2, 1, 1, 
             alignment=widget_align)
 
-        # Button: apply these masks to the localizations in a file
-        self.B_apply = QPushButton("Apply masks", parent=self.win)
-        self.B_apply.clicked.connect(self.B_apply_callback)
-        L_master.addWidget(self.B_apply, 12, 2, 1, 1, 
-            alignment=widget_align)
+        # Pure dialog mode: no options to save or load masks, only 
+        # define and accept
+        if self.dialog_mode:
 
-        # Button: save masks to a file
-        self.B_save = QPushButton("Save masks", parent=self.win)
-        self.B_save.clicked.connect(self.B_save_callback)
-        L_master.addWidget(self.B_save, 13, 2, 1, 1, 
-            alignment=widget_align)
+            # Button: accept the current set of masks. This is only meaningful
+            # when this class is being used as a dialog by other classes.
+            self.B_accept = QPushButton("Accept masks", parent=self)
+            self.B_accept.clicked.connect(self.B_accept_callback)
+            L_master.addWidget(self.B_accept, 12, 2, 1, 1, alignment=widget_align)
 
-        # Button: load preexisting masks from a file
-        self.B_load = QPushButton("Load masks", parent=self.win)
-        self.B_load.clicked.connect(self.B_load_callback)
-        L_master.addWidget(self.B_load, 14, 2, 1, 1, 
-            alignment=widget_align)
+        # Non-dialog mode: full range of options
+        else:
+
+            # Button: apply these masks to the localizations in a file
+            self.B_apply = QPushButton("Apply masks", parent=self)
+            self.B_apply.clicked.connect(self.B_apply_callback)
+            L_master.addWidget(self.B_apply, 12, 2, 1, 1, 
+                alignment=widget_align)
+
+            # Button: save masks to a file
+            self.B_save = QPushButton("Save masks", parent=self)
+            self.B_save.clicked.connect(self.B_save_callback)
+            L_master.addWidget(self.B_save, 13, 2, 1, 1, 
+                alignment=widget_align)
+
+            # Button: load preexisting masks from a file
+            self.B_load = QPushButton("Load masks", parent=self)
+            self.B_load.clicked.connect(self.B_load_callback)
+            L_master.addWidget(self.B_load, 14, 2, 1, 1, 
+                alignment=widget_align)
 
         # Resize and launch
-        self.win.resize(800, 600)
-        self.win.show()
+        self.resize(800, 600)
+        self.show()
 
     ## CORE FUNCTIONS
 
@@ -347,7 +361,7 @@ class Masker(QWidget):
             return 
 
         # Prompt the user to select an output filename
-        out_path = getSaveFilePath(self.win, "Select output CSV",
+        out_path = getSaveFilePath(self, "Select output CSV",
             "{}_masks.csv".format(os.path.splitext(self.image_path)[0]),
             "CSV files (*.csv)", initialdir=self.get_currdir())
 
@@ -383,7 +397,7 @@ class Masker(QWidget):
 
         """
         # Prompt the user to select a file
-        path = getOpenFilePath(self.win, "Select mask CSV", "CSV files (*.csv)",
+        path = getOpenFilePath(self, "Select mask CSV", "CSV files (*.csv)",
             initialdir=self.get_currdir())
         self.set_currdir(path)
 
@@ -423,7 +437,7 @@ class Masker(QWidget):
 
         """
         # Prompt the user to select a file containing localizations
-        path = getOpenFilePath(self.win, "Select localization file", 
+        path = getOpenFilePath(self, "Select localization file", 
             "CSV files (*.csv)", initialdir=self.get_currdir())
         self.set_currdir(path)
 
@@ -454,6 +468,15 @@ class Masker(QWidget):
 
         # Show the result
         show_mask_assignments(point_sets, locs, mask_col=col, max_points_scatter=5000)
+
+    def B_accept_callback(self):
+        """
+        If this GUI is being used as a dialog, accept and return the currently
+        defined set of masks.
+
+        """
+        self.return_val = [self.getPoints(p) for p in self.polyLineROIs]
+        self.accept()
 
 def get_ordered_mask_points(mask, max_points=100):
     """
