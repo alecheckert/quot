@@ -8,6 +8,7 @@ import sys
 import numpy as np 
 import pandas as pd 
 import matplotlib.pyplot as plt 
+from matplotlib.path import Path 
 from scipy import interpolate 
 from scipy.spatial import distance_matrix 
 
@@ -42,7 +43,8 @@ class MaskInterpolator(object):
         n_vertices      :   int, the number of vertices to use per 
                             interpolated mask
         interp          :   str, "linear" or "cubic", the type of 
-                            interpolation to use
+                            interpolation to use. Note that at least 4 
+                            masks are required for cubic spline interpolation.
         plot            :   bool, show a plot of the vertex matching between
                             interpolated masks during initialization, for QC
 
@@ -95,13 +97,19 @@ class MaskInterpolator(object):
 
         """
         assert points.shape[0] == frame_indices.shape[0]
+
+        # Format as ndarray
+        if isinstance(points, pd.DataFrame):
+            points = np.asarray(points)
+        if isinstance(frame_indices, pd.Series):
+            frame_indices = np.asarray(frame_indices)
+
         unique_frames = np.unique(frame_indices)
         assignments = np.empty(points.shape[0])
         for frame_index in np.unique(frame_indices):
             mask = Path(self.interpolate(frame_index), closed=True)
             in_frame = frame_indices == frame_index 
-            assignments[in_frame] = mask.contains_points(
-                points[in_frame,0], points[in_frame,1])
+            assignments[in_frame] = mask.contains_points(points[in_frame,:])
         return assignments
 
     def interpolate(self, frame):
