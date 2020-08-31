@@ -15,6 +15,10 @@ from tqdm import tqdm
 # Dataframes
 import pandas as pd 
 
+# Parallelization
+import dask 
+from dask.diagnostics import ProgressBar 
+
 # File readers and filterers
 from .chunkFilter import ChunkFilter
 
@@ -83,7 +87,7 @@ def track_file(path, out_csv=None, **kwargs):
         path        :   str, path to the image file
         out_csv     :   str, path to save file, if 
                         desired
-        kwargs      :   configuration
+        kwargs      :   tracking configuration
 
     returns
     -------
@@ -103,8 +107,49 @@ def track_file(path, out_csv=None, **kwargs):
 
     return locs 
 
-def track_directory(path, ext='.nd2', verbose=True, 
-    **kwargs):
+def track_files(paths, num_workers=4, save=True, **kwargs):
+    """
+    Run tracking on several files using parallelization.
+
+    args
+    ----
+        paths       :   list of str, paths to image files to track
+        num_workers :   int, the number of threads to use
+        save        :   bool, save the output to CSVs files. The names
+                        for these CSVs are generated from the names of 
+                        the corresponding image files.
+        kwargs      :   tracking configuration, as read with 
+                        quot.io.read_config
+
+    returns
+    -------
+        list of pandas.DataFrame, the tracking results for each 
+            file
+
+    """
+    # Tracking function for one file with lazy evaluation
+    @dask.delayed 
+    def driver(path):
+        if save:
+            out_csv = "{}_trajs.csv".format(os.path.splitext(path)[0])
+        else:
+            out_csv = None 
+        return track_file(
+            path,
+            out_csv=out_csv,
+            **kwargs
+        )
+
+    # Run localization and tracking on each file
+    results = [driver(path) for path in paths]
+    scheduler = "single-threaded" if num_workers == 1 else "processes"
+    with ProgressBar():
+        dask.compute(*results, scheduler=scheduler, num_workers=num_workers)
+
+    return results 
+
+
+def track_directory(path, ext='.nd2', num_workers=4, save=True, **kwargs):
     """
     Find all image files in a directory and run 
     localization and tracking.
@@ -113,7 +158,10 @@ def track_directory(path, ext='.nd2', verbose=True,
     ----
         path        :   str, path to directory
         ext         :   str, image file extension
-        verbose     :   bool
+        num_workers :   int, the number of threads
+                        to use 
+        save        :   bool, save the results to CSV
+                        files
         kwargs      :   configuration
 
     returns
@@ -130,11 +178,6 @@ def track_directory(path, ext='.nd2', verbose=True,
     # Find all image files in this directory
     image_paths = glob("%s/*%s" % (path, ext))
 
-    # Format the save files
-    out_csvs = [i.replace(ext, "_trajs.csv") for i in image_paths]
+    # Run tracking and localization
+    track_files(image_paths, num_workers=num_workers, save=save, **kwargs)
 
-    # Run pipeline on each file
-    for path, out_csv in zip(image_paths, out_csvs):
-        if verbose: print("Working on file %s..." % path)
-        trajs = track_file(path, out_csv=out_csv, **kwargs)
-        if verbose: print("Finished with file %s..." % path)

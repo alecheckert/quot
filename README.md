@@ -86,6 +86,12 @@ Batch tracking can also be run on directories with SPT movies using the `track_d
 
     # Run localization and tracking on each ND2 file in 
     # this directory, saving results as CSVs
-    track_directory("path/to/ND2/files", ext=".nd2", **config)
+    track_directory(
+        "path/to/ND2/files",  # directory containing image files
+        ext=".nd2",           # extension of target image files
+        num_workers=4,        # number of threads to use
+        save=True,            # save results to CSVs
+        **config              # experimental configuration
+    )
 
 ```
