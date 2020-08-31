@@ -5,6 +5,7 @@ dependencies:
   - python=3.7.4
   - distributed=2.6.0
 #  - numpy=1.17.2 # let conda decide the version 
+  - dask
   - ipython=7.8.0
   - xmltodict
   - jupyterlab=1.1.4
