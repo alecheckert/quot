@@ -31,7 +31,7 @@ from .subpixel import localize_frame
 # Core tracking function
 from .track import track 
 
-def localize_file(path, out_csv=None, **kwargs):
+def localize_file(path, out_csv=None, progress_bar=True, **kwargs):
     """
     Run filtering, detection, and subpixel localization on 
     a single image movie. This does NOT perform tracking.
@@ -41,6 +41,7 @@ def localize_file(path, out_csv=None, **kwargs):
         path        :   str, path to the image file
         out_csv     :   str, path to save file, if 
                         desired
+        progress_bar:   bool, show a progress bar
         kwargs      :   configuration
 
     returns
@@ -56,8 +57,12 @@ def localize_file(path, out_csv=None, **kwargs):
     # settings, if desired
     with ChunkFilter(path, **kwargs['filter']) as f:
 
+        frames = enumerate(f)
+        if progress_bar:
+            frames = tqdm(frames)
+
         locs = []
-        for frame_idx, frame in tqdm(enumerate(f)):
+        for frame_idx, frame in frames:
 
             # Find spots in this image frame
             detections = detect(frame, **kwargs['detect'])
@@ -77,7 +82,7 @@ def localize_file(path, out_csv=None, **kwargs):
 
     return locs 
 
-def track_file(path, out_csv=None, **kwargs):
+def track_file(path, out_csv=None, progress_bar=True, **kwargs):
     """
     Run filtering, detection, subpixel localization, and 
     tracking on a single target movie.
@@ -87,6 +92,7 @@ def track_file(path, out_csv=None, **kwargs):
         path        :   str, path to the image file
         out_csv     :   str, path to save file, if 
                         desired
+        progress_bar:   bool, show a progress bar
         kwargs      :   tracking configuration
 
     returns
@@ -96,7 +102,8 @@ def track_file(path, out_csv=None, **kwargs):
 
     """ 
     # Run filtering + detection + localization
-    locs = localize_file(path, out_csv=None, **kwargs)
+    locs = localize_file(path, out_csv=None, progress_bar=progress_bar,
+        **kwargs)
 
     # Track localizations between frames
     locs = track(locs, **kwargs['track'])
@@ -137,6 +144,7 @@ def track_files(paths, num_workers=4, save=True, **kwargs):
         return track_file(
             path,
             out_csv=out_csv,
+            progress_bar=False,
             **kwargs
         )
 
