@@ -396,4 +396,3 @@ class ImageReader(object):
         tifffile.imsave(path, 
             self.get_subregion_range(**kwargs).astype('uint16'))
 
-

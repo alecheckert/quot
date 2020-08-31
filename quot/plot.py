@@ -254,6 +254,68 @@ def plotRadialDispsBar(radial_disps, bin_edges, frame_interval=0.00548,
     else:
         return fig, ax 
 
+def plot_pixel_mean_variance(means, variances, origin_files=None,
+    model_gain=None, model_bg=None):
+    """
+    Plot pixel mean vs. variance for one or several movies,
+    overlaying a linear gain model on top if desired.
+
+    Best called through quot.read.measure_camera_gain.
+
+    args
+    ----
+        means           :   list of 1D ndarray, the pixel 
+                            means for each movie to plot
+        variances       :   list of 1D ndarray, the pixel
+                            variances for each movie to plot
+        origin_files    :   list of str, the labels for each
+                            element in *means* and *variances*
+        model_gain      :   float, the camera gain 
+        model_bg        :   float, the camera BG
+
+    """
+    # Check user inputs
+    assert len(means) == len(variances)
+    if not origin_files is None:
+        assert len(origin_files) == len(means)
+
+    # Plot setup
+    fig, ax = plt.subplots(figsize=(3, 3))
+    cmap = cm.get_cmap("gray", len(means)+2)
+    colors = [mpl_colors.rgb2hex(cmap(i)) for i in range(len(means)+2)]
+
+    # Plot each set of means and variances in a different color
+    for i, (pixel_means, pixel_vars) in enumerate(zip(means, variances)):
+        if not origin_files is None:
+            label = origin_files[i]
+        else:
+            label = None 
+        ax.scatter(pixel_means, pixel_vars, s=20, color=colors[i+1], label=label)
+
+    # Plot the model overlay
+    if (not model_gain is None) and (not model_bg is None):
+        mean_min = min([j.min() for j in means])
+        mean_max = max([j.max() for j in means])
+        model_means = np.linspace(mean_min, mean_max, 101)
+        model_vars = (model_means - model_bg) * model_gain 
+        ax.plot(model_means, model_vars, linestyle='--', color='k', label="Model")
+
+    # Limit the y extent if there are variance outliers (which is common)
+    var_upper = np.percentile(np.concatenate(variances), 99.9)
+    ax.set_ylim((0, var_upper*1.5))
+
+    # Labels
+    ax.legend(frameon=False, prop={'size': 6}, loc="upper left")
+    ax.set_xlabel("Pixel mean (AU)")
+    ax.set_ylabel("Pixel variance (AU$^{2}$)")
+
+    plt.tight_layout(); plt.show(); plt.close()
+
+
+
+
+
+
 
 
 
