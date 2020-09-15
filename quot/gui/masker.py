@@ -459,12 +459,18 @@ class Masker(QDialog):
         col = getTextInputs(["Mask column name"], ["mask_index"],
             title="Select output column name")[0]
 
-        # Save to the same file
-        locs.to_csv(path, index=False)
-
         # Assign each localization to one of the current masks
         point_sets = [self.getPoints(p) for p in self.polyLineROIs]
         locs[col] = apply_masks(point_sets, locs)
+
+        # Save to the same file
+        locs.to_csv(path, index=False)
+
+        # Save only the masked trajectories to a different file
+        out_file_inside = "{}_in_mask.csv".format(os.path.splitext(os.path.basename(path))[0])
+        out_file_outside = "{}_outside_mask.csv".format(os.path.splitext(os.path.basename(path))[0])
+        locs[locs["mask_index"] > 0].to_csv(out_file_inside, index=False)
+        locs[locs["mask_index"] == 0].to_csv(out_file_outside, index=False)
 
         # Show the result
         show_mask_assignments(point_sets, locs, mask_col=col, max_points_scatter=5000)
@@ -614,6 +620,9 @@ def show_mask_assignments(point_sets, locs, mask_col="mask_index",
                             plot in the scatter plot (for memory efficiency)
 
     """
+    # Only consider points that do not have the error flag set
+    locs = locs[locs["error_flag"] == 0.0].copy()
+
     # Estimate the size of the ROI
     y_max = int(np.ceil(locs["y"].max()))
     x_max = int(np.ceil(locs["x"].max()))
