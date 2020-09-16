@@ -467,8 +467,8 @@ class Masker(QDialog):
         locs.to_csv(path, index=False)
 
         # Save only the masked trajectories to a different file
-        out_file_inside = "{}_in_mask.csv".format(os.path.splitext(os.path.basename(path))[0])
-        out_file_outside = "{}_outside_mask.csv".format(os.path.splitext(os.path.basename(path))[0])
+        out_file_inside = "{}_in_mask.csv".format(os.path.splitext(path)[0])
+        out_file_outside = "{}_outside_mask.csv".format(os.path.splitext(path)[0])
         locs[locs["mask_index"] > 0].to_csv(out_file_inside, index=False)
         locs[locs["mask_index"] == 0].to_csv(out_file_outside, index=False)
 
