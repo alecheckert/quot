@@ -31,7 +31,9 @@ from matplotlib import colors as mpl_colors
 # Core GUI utilities
 from PySide2.QtCore import Qt 
 from PySide2.QtWidgets import QWidget, QLabel, QPushButton, \
-    QVBoxLayout, QGridLayout, QApplication, QDialog
+    QVBoxLayout, QGridLayout, QApplication, QDialog, QShortcut
+from PySide2.QtGui import Qt as QtGui_Qt
+from PySide2.QtGui import QKeySequence
 
 # pyqtgraph utilities for images and overlays
 from pyqtgraph import ImageView, ScatterPlotItem, GraphItem, \
@@ -258,6 +260,13 @@ class SpotViewer(QWidget):
             L_left.addWidget(q, j, 0, alignment=widget_align)
 
 
+        ## KEYBOARD SHORTCUTS - tab right/left through frames
+        self.left_shortcut = QShortcut(QKeySequence(QtGui_Qt.Key_Left), self.win)
+        self.right_shortcut = QShortcut(QKeySequence(QtGui_Qt.Key_Right), self.win)
+        self.left_shortcut.activated.connect(self.tab_prev_frame)
+        self.right_shortcut.activated.connect(self.tab_next_frame)
+
+
         ## DISPLAY
         self.update_image(autoRange=True, autoLevels=True, autoHistogramRange=True)
         self.overlay_spots()
@@ -305,6 +314,26 @@ class SpotViewer(QWidget):
 
         # Load the new set of spots
         self.load_spots(frame_index)
+
+    def tab_next_frame(self):
+        """
+        Load the next frame.
+
+        """
+        next_idx = int(self.frame_slider.value())
+        if next_idx < self.imageReader.n_frames - 1:
+            next_idx += 1
+        self.frame_slider.slider.setValue(next_idx)
+
+    def tab_prev_frame(self):
+        """
+        Load the previous frame.
+
+        """
+        prev_idx = int(self.frame_slider.value())
+        if prev_idx != 0:
+            prev_idx -= 1
+        self.frame_slider.slider.setValue(prev_idx)
 
     def generate_color_spot_dict(self, color_col):
         """

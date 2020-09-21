@@ -29,7 +29,9 @@ from matplotlib import colors as mpl_colors
 # Core GUI utilities
 from PySide2.QtCore import Qt 
 from PySide2.QtWidgets import QWidget, QLabel, QPushButton, \
-    QVBoxLayout, QGridLayout, QDialog 
+    QVBoxLayout, QGridLayout, QDialog, QShortcut
+from PySide2.QtGui import Qt as QtGui_Qt 
+from PySide2.QtGui import QKeySequence
 
 # pyqtgraph image display utilities
 from pyqtgraph import ImageView, ScatterPlotItem, GraphItem 
@@ -193,6 +195,18 @@ class TrackViewer(QWidget):
         self.B_search_radius = QPushButton("Show search radii", parent=win_right)
         L_right.addWidget(self.B_search_radius, 9, 1, alignment=widget_align)
         self.B_search_radius.clicked.connect(self.B_search_radius_callback)
+
+
+        ## KEYBOARD SHORTCUTS 
+
+        # Tab right/left through frames
+        self.left_shortcut = QShortcut(QKeySequence(QtGui_Qt.Key_Left), self.win)
+        self.right_shortcut = QShortcut(QKeySequence(QtGui_Qt.Key_Right), self.win)
+        self.left_shortcut.activated.connect(self.tab_prev_frame)
+        self.right_shortcut.activated.connect(self.tab_next_frame)
+
+
+        ## INITIALIZATION
 
         # overlay the first set of localizations
         self.change_track_method(self.M_method.currentText())
@@ -425,6 +439,26 @@ class TrackViewer(QWidget):
         self.update_image(frame_index=frame_index)
         self.update_tracks()
         self.overlay_search_radii()
+
+    def tab_next_frame(self):
+        """
+        Go to the next frame. Signaled by the right arrow key.
+
+        """
+        next_idx = int(self.frame_slider.value())
+        if next_idx < self.imageReader.n_frames - 1:
+            next_idx += 1
+        self.frame_slider.slider.setValue(next_idx)
+
+    def tab_prev_frame(self):
+        """
+        Go to the previous frame. Signaled by the left arrow key.
+
+        """
+        prev_idx = int(self.frame_slider.value())
+        if prev_idx != 0:
+            prev_idx -= 1
+        self.frame_slider.slider.setValue(prev_idx)
 
     def B_overlay_callback(self):
         """

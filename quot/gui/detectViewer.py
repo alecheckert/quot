@@ -28,7 +28,9 @@ from ..findSpots import detect
 import PySide2
 from PySide2.QtCore import Qt 
 from PySide2.QtWidgets import QApplication, QWidget, QLabel, \
-    QPushButton, QGridLayout, QVBoxLayout, QDialog 
+    QPushButton, QGridLayout, QVBoxLayout, QDialog, QShortcut
+from PySide2.QtGui import Qt as QtGui_Qt
+from PySide2.QtGui import QKeySequence
 
 # pyqtgraph utilities for rendering images and spots
 from pyqtgraph import ImageView, ScatterPlotItem 
@@ -229,6 +231,12 @@ class DetectViewer(QWidget):
         for j in range(8, 24):
             _ql = QLabel(win_right)
             L_right.addWidget(_ql, j, 0, alignment=widget_align)
+
+        ## KEYBOARD SHORTCUTS - tab right/left through frames
+        self.left_shortcut = QShortcut(QKeySequence(QtGui_Qt.Key_Left), self.win)
+        self.right_shortcut = QShortcut(QKeySequence(QtGui_Qt.Key_Right), self.win)
+        self.left_shortcut.activated.connect(self.tab_prev_frame)
+        self.right_shortcut.activated.connect(self.tab_next_frame)
 
         ## INITIALIZATION
         self.change_detect_method(init_detect_method)
@@ -656,6 +664,28 @@ class DetectViewer(QWidget):
         # Get as many spots as 
         ex = ImageSubpositionWindow(images, 
             positions, w=15, N=N, parent=self)
+
+    ## KEYBOARD SHORTCUT CALLBACKS
+
+    def tab_next_frame(self):
+        """
+        Load the next frame.
+
+        """
+        next_idx = int(self.frame_slider.value())
+        if next_idx < self.ChunkFilter.n_frames - 1:
+            next_idx += 1
+        self.frame_slider.slider.setValue(next_idx)
+
+    def tab_prev_frame(self):
+        """
+        Load the previous frame.
+
+        """
+        prev_idx = int(self.frame_slider.value())
+        if prev_idx != 0:
+            prev_idx -= 1
+        self.frame_slider.slider.setValue(prev_idx)   
 
 
 

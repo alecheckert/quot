@@ -10,7 +10,9 @@ from ..read import ImageReader
 import PySide2
 from PySide2.QtCore import Qt 
 from PySide2.QtWidgets import QWidget, QGridLayout, \
-    QPushButton, QDialog, QLabel, QLineEdit 
+    QPushButton, QDialog, QLabel, QLineEdit, QShortcut
+from PySide2.QtGui import QKeySequence
+from PySide2.QtGui import Qt as QtGui_Qt
 
 # pyqtgraph utilities for showing images
 from pyqtgraph import ImageView 
@@ -69,6 +71,12 @@ class ImageViewer(QWidget):
         layout.addWidget(self.B_max_int, 3, 0, 1, 1, alignment=Qt.AlignLeft)
         self.B_max_int.clicked.connect(self.B_max_int_callback)
 
+        # Use the right/left keys to tab through frames
+        self.left_shortcut = QShortcut(QKeySequence(QtGui_Qt.Key_Left), self.win)
+        self.right_shortcut = QShortcut(QKeySequence(QtGui_Qt.Key_Right), self.win)
+        self.left_shortcut.activated.connect(self.prev_frame)
+        self.right_shortcut.activated.connect(self.next_frame)
+
         # Update the frame
         self.load_frame(0, reset=True)
 
@@ -91,6 +99,26 @@ class ImageViewer(QWidget):
         self.image = self.ImageReader.get_frame(frame_index)
         self.ImageView.setImage(self.image, autoRange=reset, autoLevels=reset,
             autoHistogramRange=reset)
+
+    def next_frame(self):
+        """
+        Go to the frame after the current one.
+
+        """
+        next_idx = int(self.frame_slider.value())
+        if next_idx != self.ImageReader.n_frames - 1:
+            next_idx += 1
+        self.frame_slider.slider.setValue(next_idx)
+
+    def prev_frame(self):
+        """
+        Go the frame before the current one.
+
+        """
+        prev_idx = int(self.frame_slider.value())
+        if prev_idx != 0:
+            prev_idx -= 1
+        self.frame_slider.slider.setValue(prev_idx)
 
     def frame_slider_callback(self):
         """
