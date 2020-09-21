@@ -95,3 +95,12 @@ Batch tracking can also be run on directories with SPT movies using the `track_d
     )
 
 ```
+
+## Finding external hard drives
+
+Some users have reported trouble finding external hard drives with the `quot` file selection dialogs. If this happens, try the following:
+
+1. Look under `/Volumes` (if using macOS).
+2. If the hard drive is not visible under `/Volumes`, navigate to the hard drive in the Terminal and launch an instance of the `quot` GUI on an image file there (for instance, `quot image some_random_file.nd2`). The file should be stored on the hard drive. On macOS Catalina, this triggers a permissions dialog that makes the hard drive subsequentialy visible in the `quot` file dialog selections.
+
+If you continue to have trouble finding the external hard drives, contact <aheckert@berkeley.edu>.
