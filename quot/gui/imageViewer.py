@@ -106,9 +106,9 @@ class ImageViewer(QWidget):
 
         """
         next_idx = int(self.frame_slider.value())
-        if next_idx != self.ImageReader.n_frames - 1:
+        if next_idx < self.frame_slider.maximum:
             next_idx += 1
-        self.frame_slider.slider.setValue(next_idx)
+        self.frame_slider.setValue(next_idx)
 
     def prev_frame(self):
         """
@@ -116,9 +116,9 @@ class ImageViewer(QWidget):
 
         """
         prev_idx = int(self.frame_slider.value())
-        if prev_idx != 0:
+        if prev_idx > self.frame_slider.minimum:
             prev_idx -= 1
-        self.frame_slider.slider.setValue(prev_idx)
+        self.frame_slider.setValue(prev_idx)
 
     def frame_slider_callback(self):
         """

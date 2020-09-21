@@ -184,7 +184,7 @@ class DetectViewer(QWidget):
         L_right.addWidget(self.M_detect, 0, 1, alignment=widget_align)
 
         # Set the initial detection method and arguments
-        init_detect_method = 'llr_rect'
+        init_detect_method = 'llr'
         self.M_detect.setCurrentText(init_detect_method)
         self.detect_kwargs = {DETECT_SLIDER_CONFIG[init_detect_method][i]['name']: \
             DETECT_SLIDER_CONFIG[init_detect_method][i]['init_value'] \
@@ -673,9 +673,9 @@ class DetectViewer(QWidget):
 
         """
         next_idx = int(self.frame_slider.value())
-        if next_idx < self.ChunkFilter.n_frames - 1:
+        if next_idx < self.frame_slider.maximum - 1:
             next_idx += 1
-        self.frame_slider.slider.setValue(next_idx)
+        self.frame_slider.setValue(next_idx)
 
     def tab_prev_frame(self):
         """
@@ -683,9 +683,9 @@ class DetectViewer(QWidget):
 
         """
         prev_idx = int(self.frame_slider.value())
-        if prev_idx != 0:
+        if prev_idx > self.frame_slider.minimum:
             prev_idx -= 1
-        self.frame_slider.slider.setValue(prev_idx)   
+        self.frame_slider.setValue(prev_idx)
 
 
 

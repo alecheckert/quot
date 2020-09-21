@@ -728,6 +728,19 @@ class IntSlider(QWidget):
         # Update the current label 
         self._set_label_current()
 
+    def setValue(self, value):
+        """
+        Set the current value of the slider. (This is in terms of the
+        units that are shown to the user, rather than the units of the 
+        underlying QSlider object.)
+
+        """
+        if value < self.minimum or value > self.maximum:
+            raise RuntimeError("guiUtils.IntSlider.setValue: value {} is outside " \
+                "acceptable range ({}, {})".format(value, self.minimum, self.maximum))
+        midx = np.argmin(np.abs(self.slider_values - value))
+        self.slider.setValue(midx)
+
     def sizeHint(self):
         """
         Recommended size of this QWidget to the 

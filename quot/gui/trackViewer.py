@@ -446,9 +446,9 @@ class TrackViewer(QWidget):
 
         """
         next_idx = int(self.frame_slider.value())
-        if next_idx < self.imageReader.n_frames - 1:
+        if next_idx < self.frame_slider.maximum:
             next_idx += 1
-        self.frame_slider.slider.setValue(next_idx)
+        self.frame_slider.setValue(next_idx)
 
     def tab_prev_frame(self):
         """
@@ -456,9 +456,9 @@ class TrackViewer(QWidget):
 
         """
         prev_idx = int(self.frame_slider.value())
-        if prev_idx != 0:
+        if prev_idx > self.frame_slider.minimum:
             prev_idx -= 1
-        self.frame_slider.slider.setValue(prev_idx)
+        self.frame_slider.setValue(prev_idx)
 
     def B_overlay_callback(self):
         """
