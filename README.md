@@ -1,5 +1,5 @@
 # quot
-A simple GUI to compare spot detection methods in single molecule tracking data.
+A simple GUI to compare spot detection and tracking methods in single molecule tracking data.
 
 ## Install
 
