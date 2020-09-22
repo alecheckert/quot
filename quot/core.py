@@ -97,8 +97,7 @@ def track_file(path, out_csv=None, progress_bar=True, **kwargs):
 
     returns
     -------
-        pandas.DataFrame, the localizations indexed by 
-            trajectory
+        pandas.DataFrame, the reconnected localizations
 
     """ 
     # Run filtering + detection + localization
@@ -156,8 +155,8 @@ def track_files(paths, num_workers=4, save=True, **kwargs):
 
     return results 
 
-
-def track_directory(path, ext='.nd2', num_workers=4, save=True, **kwargs):
+def track_directory(path, ext='.nd2', num_workers=4, save=True, contains=None,
+    **kwargs):
     """
     Find all image files in a directory and run 
     localization and tracking.
@@ -170,6 +169,8 @@ def track_directory(path, ext='.nd2', num_workers=4, save=True, **kwargs):
                         to use 
         save        :   bool, save the results to CSV
                         files
+        contains    :   str, a substring that all image files 
+                        are required to contain
         kwargs      :   configuration
 
     returns
@@ -186,6 +187,76 @@ def track_directory(path, ext='.nd2', num_workers=4, save=True, **kwargs):
     # Find all image files in this directory
     image_paths = glob("%s/*%s" % (path, ext))
 
+    # Only include image files with a substring, if specified
+    if not contains is None:
+        image_paths = [j for j in image_paths if contains in os.path.basename(j)]
+
     # Run tracking and localization
     track_files(image_paths, num_workers=num_workers, save=save, **kwargs)
 
+def retrack_file(path, out_csv=None, **kwargs):
+    """
+    Given an existing set of localizations or trajectories, (re)run tracking
+    to reconstruct trajectories.
+
+    args
+    ----
+        path        :   str, path to a *trajs.csv file
+        out_csv     :   str, path to save the resulting trajectories, if 
+                        desired
+        kwargs      :   tracking configuration
+
+    returns
+    -------
+        pandas.DataFrame, the reconnected localizations 
+
+    """
+    # Load the file
+    T = pd.read_csv(path)
+
+    # Track localizations between frames
+    T = track(T, **kwargs)
+
+    # Save to a file, if desired
+    if not out_csv is None:
+        T.to_csv(out_csv, index=False)
+
+    return T 
+
+def retrack_files(paths, out_suffix=None, num_workers=1, **kwargs):
+    """
+    Given a set of localizations, run retracking on each file and save to a 
+    CSV.
+
+    If *out_suffix* is not specified, then the trajectories are saved to the 
+    original set of localization files (overwriting them).
+
+    args
+    ----
+        paths       :   list of str, a set of CSV files encoding trajectories
+        out_suffix  :   str, the suffix to use when generating the output 
+                        paths. If *None*, then the output trajectories are 
+                        saved to the original file path.
+        num_workers :   int, the number of threads to use
+        kwargs      :   tracking configuration
+
+    """
+    # Avoid redundant extensions
+    if (not out_suffix is None) and (not ".csv" in out_suffix):
+        out_suffix = "{}.csv".format(out_suffix)
+
+    @dask.delayed 
+    def task(fn):
+        """
+        Retrack one file.
+
+        """
+        out_csv = fn if out_suffix is None else \
+            "{}_{}".format(os.path.splitext(fn)[0], out_suffix)
+        retrack_file(fn, out_csv=out_csv, **kwargs)
+
+    # Run retracking on all files
+    scheduler = "single-threaded" if num_workers == 1 else "processes"
+    tasks = [task(fn) for fn in paths]
+    with ProgressBar():
+        dask.compute(*tasks, num_workers=num_workers, scheduler=scheduler)
