@@ -9,8 +9,13 @@ import pyqtgraph
 
 # Core functions to run localization and tracking on single files
 # or directories
-from .core import localize_file, track_file, track_directory,
-    retrack_file, retrack_files
+from .core import (
+    localize_file,
+    track_file,
+    track_directory,
+    retrack_file,
+    retrack_files
+)
 
 # Read and filter image files
 from .read import ImageReader, read_config

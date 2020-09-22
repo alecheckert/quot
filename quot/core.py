@@ -253,7 +253,7 @@ def retrack_files(paths, out_suffix=None, num_workers=1, **kwargs):
         """
         out_csv = fn if out_suffix is None else \
             "{}_{}".format(os.path.splitext(fn)[0], out_suffix)
-        retrack_file(fn, out_csv=out_csv, **kwargs)
+        retrack_file(fn, out_csv=out_csv, **kwargs["track"])
 
     # Run retracking on all files
     scheduler = "single-threaded" if num_workers == 1 else "processes"
