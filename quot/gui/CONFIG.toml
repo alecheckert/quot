@@ -268,21 +268,21 @@
         minimum = 0.1
         maximum = 7.0
         interval = 0.1
-        init_value = 1.0
+        init_value = 1.3
         type = "float"
     [detect_slider_config.llr.w]
         name = "w"
         minimum = 3
-        maximum = 21
+        maximum = 25
         interval = 1
-        init_value = 9
+        init_value = 5
         type = "int"
     [detect_slider_config.llr.t]
         name = "t"
         minimum = 0.0
         maximum = 30.0
         interval = 0.1
-        init_value = 18.0
+        init_value = 16.0
         type = "float"
 
 [detect_slider_config.hess_det]

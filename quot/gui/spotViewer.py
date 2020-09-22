@@ -47,7 +47,7 @@ from .guiUtils import FloatSlider, IntSlider, LabeledQComboBox, \
     ImageSubpositionCompare, format_dict 
 
 # Default parameters for spot overlays
-pen_width = 3
+pen_width = 5
 overlay_params = {'pxMode': False, 'brush': None,
     'pen': {'color': MASTER_COLOR, 'width': pen_width}}
 
@@ -270,6 +270,9 @@ class SpotViewer(QWidget):
         ## DISPLAY
         self.update_image(autoRange=True, autoLevels=True, autoHistogramRange=True)
         self.overlay_spots()
+        if "trajectory" in self.locs.columns:
+            self.M_color_by.setCurrentText("Trajectory")
+            self.M_color_by_callback()
         self.win.show()
 
     ## CORE FUNCTIONS
