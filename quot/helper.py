@@ -1333,4 +1333,40 @@ def connected_components(semigraph):
 
     return subgraphs, subgraph_y_indices, subgraph_x_indices, y_without_x, x_without_y
 
+#######################
+## MASKING UTILITIES ##
+#######################
+
+def get_edges(bin_img):
+    """
+    Given a binary image that is False outside of an object and True
+    inside of it, return another binary image that is True for points
+    in the original image that border a False pixel, and False otherwise.
+
+    args
+    ----
+        bin_img         :   2D ndarray, dtype bool
+
+    returns
+    -------
+        2D ndarray, dtype bool, shape shape as bin_img
+
+    """
+    assert bin_img.dtype == np.bool, "get_edges: must be bool input"
+    out = np.zeros(bin_img.shape, dtype="bool")
+
+    # Find the edges of the binary mask
+    out[1:, :] = out[1:, :] | (bin_img[1:, :] & ~bin_img[:-1, :])
+    out[:, 1:] = out[:, 1:] | (bin_img[:, 1:] & ~bin_img[:, :-1])
+    out[:-1, :] = out[:-1, :] | (bin_img[:-1, :] & ~bin_img[1:, :])
+    out[:, :-1] = out[:, :-1] | (bin_img[:, :-1] & ~bin_img[:, 1:])
+
+    # Figure out where the object in the binary image intersects
+    # the edge of the image frame
+    out[0, :] = out[0, :] | bin_img[0, :]
+    out[:, 0] = out[:, 0] | bin_img[:, 0]
+    out[-1, :] = out[-1, :] | bin_img[-1, :]
+    out[:, -1] = out[:, -1] | bin_img[:, -1]
+
+    return out
 

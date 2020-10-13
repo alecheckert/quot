@@ -244,8 +244,8 @@ def upsample_2d_path(points, kind="cubic", n_vertices=101):
 
 def shoelace(points):
     """
-    Shoelace algorithm for computing the oriented volume of a 
-    polygon. This volume is positive when the points that define
+    Shoelace algorithm for computing the oriented area of a 2D
+    polygon. This area is positive when the points that define
     the polygon are arranged counterclockwise, and negative
     otherwise.
 

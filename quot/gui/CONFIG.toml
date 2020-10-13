@@ -275,7 +275,7 @@
         minimum = 3
         maximum = 25
         interval = 1
-        init_value = 5
+        init_value = 15
         type = "int"
     [detect_slider_config.llr.t]
         name = "t"

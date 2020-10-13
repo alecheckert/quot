@@ -14,6 +14,9 @@ import numpy as np
 # Uniform filter
 from scipy import ndimage as ndi 
 
+# TIF file reader
+import tifffile
+
 # Dataframes
 import pandas as pd 
 
@@ -27,6 +30,9 @@ from matplotlib.path import Path
 
 # File readers
 from ..read import ImageReader 
+
+# Get the edges of a binary mask
+from ..helper import get_edges 
 
 # Core GUI utilities
 import PySide2
@@ -397,27 +403,53 @@ class Masker(QDialog):
 
         """
         # Prompt the user to select a file
-        path = getOpenFilePath(self, "Select mask CSV", "CSV files (*.csv)",
+        path = getOpenFilePath(self, "Select mask CSV", "CSV and TIF files (*.csv *.tif *.tiff)",
             initialdir=self.get_currdir())
         self.set_currdir(path)
 
-        # Open this file and check that it contains the necessary info
-        try:
-            df = pd.read_csv(path)
-            for c in ["filename", "mask_index", "y", "x", "vertex"]:
-                assert c in df.columns 
-        except:
-            print("File {} not in the correct format; must be a CSV with " \
-                "the 'filename', 'mask_index', 'y', 'x', and 'vertex' " \
-                "columns".format(path))
-            return 
+        ext = os.path.splitext(path)[-1]
 
-        # Warn the user if the image file path in this file doesn't
-        # match the current image file path 
-        if df.loc[0, "filename"] != self.image_path:
-            print("WARNING: original file path for this mask file is different " \
-                "than the current image file.\nOriginal: {}\nCurrent: {}".format(
-                    df.loc[0, "filename"], self.image_path))
+        # Open this file and check that it contains the necessary info
+        if ext == ".csv":
+            try:
+                df = pd.read_csv(path)
+                for c in ["filename", "mask_index", "y", "x", "vertex"]:
+                    assert c in df.columns 
+            except:
+                print("File {} not in the correct format; must be a CSV with " \
+                    "the 'filename', 'mask_index', 'y', 'x', and 'vertex' " \
+                    "columns".format(path))
+                return 
+
+            # Warn the user if the image file path in this file doesn't
+            # match the current image file path 
+            if df.loc[0, "filename"] != self.image_path:
+                print("WARNING: original file path for this mask file is different " \
+                    "than the current image file.\nOriginal: {}\nCurrent: {}".format(
+                        df.loc[0, "filename"], self.image_path))
+        elif ext in [".tif", ".tiff"]:
+
+            # Load the mask image
+            masks_im = tifffile.imread(path)
+            assert len(masks_im.shape) == 2, "WARNING: RGB TIFs not supported"
+
+            # Get the set of unique masks defined in this image
+            n_points = 100
+            mask_indices = [j for j in list(np.unique(masks_im)) if j != 0]
+            dfs = []
+            for mi in mask_indices:
+                mask_im = masks_im == mi
+                edges = get_edges(mask_im)
+                points = get_ordered_mask_points(edges, max_points=n_points)
+                df = pd.DataFrame(index=list(range(points.shape[0])), 
+                    columns=["filename", "mask_index", "y", "x"])
+                df["filename"]= path 
+                df["mask_index"] = mi
+                df["y"] = points[:,0]
+                df["x"] = points[:,1]
+                df["vertex"] = list(range(points.shape[0]))
+                dfs.append(df)
+            df = pd.concat(dfs, axis=0, ignore_index=True)
 
         # Erase the current set of masks, if any 
         self.clear_polyLineROIs()
