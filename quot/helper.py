@@ -6,11 +6,17 @@ quot.helper.py -- low-level utilities
 # Numeric
 import numpy as np 
 
+# Dataframes
+import pandas as pd 
+
 # Special functions
 from scipy.special import erf 
 
 # Image processing utilities
 from scipy import ndimage as ndi 
+
+# Load *.mat format files
+from scipy import io as sio 
 
 # Caching
 from functools import lru_cache 
@@ -123,6 +129,62 @@ def stable_divide_float(N, D, inf=0.0):
 
     """
     return (inf if D==0.0 else N/D)
+
+#####################
+## FILE CONVERSION ##
+#####################
+
+def tracked_mat_to_csv(path, out_csv=None, pixel_size_um=0.16):
+    """
+    Convert a file from *Tracked.mat format, a MATLAB-based
+    format for trajectories to a DataFrame format.
+
+    args
+    ----
+        path        :   str, path to a *Tracked.mat file
+        out_csv     :   str, file to save the result to 
+        pixel_size_um:  float, the size of pixels in um
+
+    returns
+    -------
+        pandas.DataFrame, the contents of the *Tracked.mat 
+            file as a DataFrame
+
+    """
+    f = sio.loadmat(path)['trackedPar']
+    if len(f.shape) == 2 and f.shape[0] == 1:
+        f = f[0,:]
+
+    # Total number of localizations in the file
+    n_locs = sum([f[i][0].shape[0] for i in range(len(f))])
+
+    # Output dataframe
+    df = pd.DataFrame(index=np.arange(n_locs),
+        columns=["y_um", "x_um", "frame", "trajectory", "time"])
+
+    # Trajectory indices
+    df["trajectory"] = np.concatenate([[i for j in range(f[i][0].shape[0])] for i in range(len(f))])
+
+    # XY positions of each localization
+    df[["y_um", "x_um"]] = np.concatenate([f[i][0] for i in range(len(f))], axis=0)
+
+    # Frame index (correct for MATLAB off-by-1)
+    df["frame"] = np.concatenate([f[i][1][:,0] for i in range(len(f))]) - 1
+
+    # Timepoint in seconds
+    df["time"] = np.concatenate([f[i][2][:,0] for i in range(len(f))])
+
+    # Convert XY positions to pixels and correct for the MATLAB
+    # off-by-1
+    df[["y", "x"]] = (df[["y_um", "x_um"]] / pixel_size_um) - 1
+
+    # Assign other columns that may be expected by other utilities
+    df["error_flag"] = 0.0
+
+    if not out_csv is None:
+        df.to_csv(out_csv, index=False)
+
+    return df
 
 ###############
 ## DETECTION ##

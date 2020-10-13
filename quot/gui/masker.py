@@ -32,7 +32,10 @@ from matplotlib.path import Path
 from ..read import ImageReader 
 
 # Get the edges of a binary mask
-from ..helper import get_edges 
+from ..helper import get_edges
+
+# Read *Tracked.mat format into a DataFrame
+from ..helper import tracked_mat_to_csv
 
 # Core GUI utilities
 import PySide2
@@ -49,7 +52,8 @@ from .guiUtils import (
     IntSlider,
     getSaveFilePath,
     getOpenFilePath,
-    getTextInputs
+    getTextInputs,
+    SingleComboBoxDialog
 )
 
 class Masker(QDialog):
@@ -470,16 +474,21 @@ class Masker(QDialog):
         """
         # Prompt the user to select a file containing localizations
         path = getOpenFilePath(self, "Select localization file", 
-            "CSV files (*.csv)", initialdir=self.get_currdir())
+            "CSV files and *Tracked.mat files (*.csv *Tracked.mat)",
+            initialdir=self.get_currdir())
         self.set_currdir(path)
 
         # Open this file and make sure it actually contains localizations
+        ext = os.path.splitext(path)[-1]
         try:
-            locs = pd.read_csv(path)
-            assert all([c in locs.columns for c in ['frame', 'y', 'x']])
+            if ext == ".csv":
+                locs = pd.read_csv(path)
+                assert all([c in locs.columns for c in ['frame', 'y', 'x']])
+            elif ext == ".mat":
+                locs = tracked_mat_to_csv(path)
         except:
-            print("File {} not in the correct format for localizations; " \
-                "must be a CSV with the 'frame', 'y', and 'x' columns".format(path))
+            print("Could not load file {}; must either be *.csv or " \
+                "*Tracked.mat format".format(path))
             return 
 
         # Prompt the user to input the mask column. This can be something 
@@ -488,19 +497,44 @@ class Masker(QDialog):
         # when the user applies masks multiple times to the same file - for
         # instance, to label primary and secondary features (e.g. nuclei and
         # nucleoli) in an image.
-        col = getTextInputs(["Mask column name"], ["mask_index"],
+        col = getTextInputs(["Output mask column name"], ["mask_index"],
             title="Select output column name")[0]
+
+        # Prompt the user to select a mode for the assignment of trajectories
+        # to masks. This can either be "by_localization" (independent of the 
+        # trajectory to which each localization is assigned), "single_point"
+        # (assign all localizations to a mask if a single localization is 
+        # inside the mask), or "all_points" (only assign all localizations to a 
+        # mask if all localizations are inside the mask)
+        options = ["by_localization", "single_point", "all_points"]
+        box = SingleComboBoxDialog("Method by which trajectories are assigned to masks",
+            options, init_value="single_point", title="Assignment mode", parent=self)
+        box.exec_()
+        if box.Accepted:
+            mode = box.return_val 
+        else:
+            print("Dialog not accepted")
+            return 
 
         # Assign each localization to one of the current masks
         point_sets = [self.getPoints(p) for p in self.polyLineROIs]
-        locs[col] = apply_masks(point_sets, locs)
+        locs[col] = apply_masks(point_sets, locs, mode=mode)
 
         # Save to the same file
-        locs.to_csv(path, index=False)
+        if ext == ".csv":
+            out_path = path 
+        elif ext == ".mat":
+            if "_Tracked.mat" in path:
+                out_path = path.replace("_Tracked.mat", ".csv")
+            elif "Tracked.mat" in path:
+                out_path = path.replace("Tracked.mat", ".csv")
+            else:
+                out_path = "{}.csv".format(os.path.splitext(path)[0])
+        locs.to_csv(out_path, index=False)
 
         # Save only the masked trajectories to a different file
-        out_file_inside = "{}_in_mask.csv".format(os.path.splitext(path)[0])
-        out_file_outside = "{}_outside_mask.csv".format(os.path.splitext(path)[0])
+        out_file_inside = "{}_in_mask.csv".format(os.path.splitext(out_path)[0])
+        out_file_outside = "{}_outside_mask.csv".format(os.path.splitext(out_path)[0])
         locs[locs["mask_index"] > 0].to_csv(out_file_inside, index=False)
         locs[locs["mask_index"] == 0].to_csv(out_file_outside, index=False)
 
@@ -579,7 +613,62 @@ def get_ordered_mask_points(mask, max_points=100):
 
     return ordered_points
 
-def inside_mask(points, locs):
+def inside_mask(points, locs, mode="single_point"):
+    """
+    args
+    ----
+        points  :   2D ndarray of shape (n_points, 2), the Y 
+                    and X points of each vertex defining the mask 
+                    edge, ordered so that they are adjacent in the
+                    mask.
+        locs    :   pandas.DataFrame, the set of localizations
+        mode    :   str, either "by_localization", "single_point"
+                    or "all_points", the criterion by which 
+                    localizations/trajectories are assigned to 
+                    masks.
+
+                    If "by_localization", then each localization
+                    is assigned to the mask depending on whether
+                    or not it is inside the mask, regardless of 
+                    the other points in the trajectory.
+
+                    If "single_point", then if a single point from
+                    each trajectory is inside the mask, all points
+                    from that trajectory are labeled as inside the
+                    mask.
+
+                    If "all_points", then a trajectory must have 
+                    all of its points inside the mask in order to be
+                    assigned to that mask. Otherwise, none of its
+                    localizations are assigned to the mask.
+
+    returns
+    -------
+        1D ndarray of shape (len(locs),), dtype bool;
+            whether each localization lies inside the mask
+
+    """
+    path = Path(points, closed=True)
+    locs["inside_mask"] = path.contains_points(locs[['y', 'x']])
+    if mode == "single_point":
+        locs = locs.join(
+            locs.groupby("trajectory")["inside_mask"].any().rename("inside_mask_by_track"),
+            on="trajectory"
+        )
+        locs["inside_mask"] = locs["inside_mask_by_track"]
+        locs = locs.drop("inside_mask_by_track", axis=1)
+    elif mode == "all_points":
+        locs = locs.join(
+            locs.groupby("trajectory")["inside_mask"].all().rename("inside_mask_by_track"),
+            on="trajectory"
+        )
+        locs["inside_mask"] = locs["inside_mask_by_track"]
+        locs = locs.drop("inside_mask_by_track", axis=1)       
+    locs_inside = np.asarray(locs["inside_mask"]).astype(np.bool)
+    locs = locs.drop("inside_mask", axis=1)
+    return locs_inside 
+
+def inside_mask_old(points, locs):
     """
     Given a set of points defining a mask, designate each localization as 
     either inside or outside of the mask.
@@ -605,7 +694,7 @@ def inside_mask(points, locs):
     # Assign each point to a mask
     return path.contains_points(locs[["y", "x"]])
 
-def apply_masks(point_sets, locs):
+def apply_masks(point_sets, locs, mode="single_point"):
     """
     Assign each of a set of localizations to one of several masks.
 
@@ -618,6 +707,9 @@ def apply_masks(point_sets, locs):
         point_sets      :   list of 2D ndarray of shape (n_points, 2), the 
                             set of vertices defining each mask
         locs            :   pandas.DataFrame, the localizations
+        mode            :   str, either "by_localization", "single_point",
+                            or "all_points", the mode by which trajectories
+                            are assigned to masks
 
     returns
     -------
@@ -628,7 +720,7 @@ def apply_masks(point_sets, locs):
     """
     assigned = np.zeros(len(locs), dtype=np.int64)
     for i, point_set in enumerate(point_sets):
-        assigned[inside_mask(point_set, locs)] = i+1 
+        assigned[inside_mask(point_set, locs, mode=mode)] = i+1 
     return assigned 
 
 def show_mask_assignments(point_sets, locs, mask_col="mask_index",
