@@ -140,12 +140,17 @@ def track_files(paths, num_workers=4, save=True, **kwargs):
             out_csv = "{}_trajs.csv".format(os.path.splitext(path)[0])
         else:
             out_csv = None 
-        return track_file(
-            path,
-            out_csv=out_csv,
-            progress_bar=False,
-            **kwargs
-        )
+        try:
+            return track_file(
+                path,
+                out_csv=out_csv,
+                progress_bar=False,
+                **kwargs
+            )
+        except Exception as e:
+            print("WARNING: Failed to analyze file {} due to exception:".format(path))
+            print(e)
+            return []
 
     # Run localization and tracking on each file
     results = [driver(path) for path in paths]

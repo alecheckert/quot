@@ -3,8 +3,18 @@
 plot.py -- simple plotting utilities for quot
 
 """
+import sys
+import os 
+
 # Numeric
 import numpy as np 
+from scipy import ndimage as ndi 
+
+# Image file reader
+from nd2reader import ND2Reader 
+
+# Dataframes, for handling trajectories
+import pandas as pd 
 
 # Core matplotlib library
 import matplotlib.pyplot as plt 
@@ -39,6 +49,42 @@ def hex_cmap(cmap, n_colors):
     C = cm.get_cmap(cmap, n_colors)
     return [mpl_colors.rgb2hex(j[:3]) for j in C.colors]
 
+def kill_ticks(axes, spines=True):
+    """
+    Remove the y and x ticks from a plot.
+
+    args
+    ----
+        axes        :   matplotlib.axes.Axes
+        spines      :   bool, also remove the spines
+
+    returns
+    -------
+        None
+
+    """
+    axes.set_xticks([])
+    axes.set_yticks([])
+    if spines:
+        for s in ['top', 'bottom', 'left', 'right']:
+            axes.spines[s].set_visible(False)
+
+def wrapup(out_png, dpi=600):
+    """
+    Save a figure to a PNG.
+
+    args
+    ----
+        out_png         :   str, save filename
+        dpi             :   int, resolution
+
+    """
+    plt.tight_layout()
+    plt.savefig(out_png, dpi=dpi)
+    plt.close()
+    if sys.platform == "darwin":
+        os.system("open {}".format(out_png))
+
 ####################
 ## IMAGE PLOTTING ##
 ####################
@@ -70,6 +116,119 @@ def imshow(*imgs, vmax_mod=1.0, plot=True):
     else:
         return fig, ax 
 
+def max_int_proj(axes, nd2_path, vmax_perc=99, vmin=None, cmap="gray",
+    pixel_size_um=0.16, scalebar=False):
+    """
+    Make a maximum intensity projection of a temporal image sequence
+    in a Nikon ND2 file.
+
+    args
+    ---
+        axes        :   matplotlib.axes.Axes
+        nd2_path    :   str, path to a target ND2 file
+        vmax_perc   :   float, percentile of the intensity histogram
+                        to use for the upper contrast bound
+        vmin        :   float
+        cmap        :   str
+        pixel_size_um:  float, size of pixels in um
+        scalebar    :   bool, make a scalebar
+
+    returns
+    -------
+        None; plots directly to *axes*
+
+    """
+    reader = ND2Reader(nd2_path)
+    mip = reader.get_frame(0).astype(np.float64)
+    for frame_idx in range(1, reader.metadata["total_images_per_channel"]):
+        try:
+            mip = np.maximum(mip, reader.get_frame(frame_idx))
+        except:
+            continue
+    if vmin is None:
+        vmin = mip.min()
+    axes.imshow(mip, cmap=cmap, vmin=vmin,
+        vmax=np.percentile(mip, vmax_perc))
+    kill_ticks(axes)
+    if scalebar:
+        try:
+            from matplotlib_scalebar.scalebar import ScaleBar
+            sb = ScaleBar(pixel_size_um, "um", frameon=False, 
+                color="w", location="lower left")
+            axes.add_artist(sb)
+        except ModuleNotFoundError:
+            print("quot.plot.max_int_proj: must have matplotlib_scalebar " \
+                "installed in order to use scalebars")
+
+def imlocdensity(axes, tracks, ymax=None, xmax=None, bin_size=0.1,
+    kernel=3.0, vmax_perc=99, cmap="gray", pixel_size_um=0.16,
+    scalebar=False):
+    """
+    Given a set of localizations from a single FOV, plot localization
+    density.
+
+    args
+    ----
+        axes        :   matplotlib.axes.Axes
+        tracks      :   pandas.DataFrame
+        ymax        :   int, the height of the FOV in pixels
+        xmax        :   int, the width of the FOV in pixels
+        bin_size    :   float, the size of the histogram bins in 
+                        terms of pixels
+        kernel      :   float, the size of the Gaussian kernel 
+                        used for density estimation
+        vmax_perc   :   float, the percentile of the density  
+                        histogram used to define the upper contrast
+                        threshold
+        cmap        :   str
+        pixel_size_um   :   float, size of pixels in um
+        scalebar    :   bool, make a scalebar. Requires the 
+                        matplotlib_scalebar package.
+
+    returns
+    -------
+        None; plots directly to *axes*
+
+    """
+    # If ymax and xmax are not provided, set them to the maximum
+    # y and x coordinates observed in the data
+    if ymax is None:
+        ymax = int(tracks['y'].max()) + 1
+    if xmax is None:
+        xmax = int(tracks['x'].max()) + 1
+
+    # Determine histogram binning scheme
+    ybins = np.arange(0, ymax, bin_size)
+    xbins = np.arange(0, xmax, bin_size)
+
+    # Accumulate localizations into a histogram
+    density = np.histogram2d(tracks['y'], tracks['x'],
+        bins=(ybins, xbins))[0].astype(np.float64)
+
+    # KDE
+    density = ndi.gaussian_filter(density, kernel)
+
+    # Plot the result
+    if density.sum() == 0:
+        s = axes.imshow(density, vmin=0, vmax=1, cmap=cmap)
+    else:
+        s = axes.imshow(density, vmin=0,
+            vmax=np.percentile(density, vmax_perc), 
+            cmap=cmap)
+
+    # Kill ticks
+    kill_ticks(axes)
+
+    # Scalebar, if desired
+    if scalebar:
+        try:
+            from matplotlib_scalebar.scalebar import ScaleBar
+            sb = ScaleBar(pixel_size_um*bin_size, "um", 
+                frameon=False, color="w", location="lower left")
+            axes.add_artist(sb)
+        except ModuleNotFoundError:
+            print("WARNING: module matplotlib_scalebar must be installed " \
+                "in order to use scalebars")
 
 ###############################
 ## PSF PLOTTING and 3D PLOTS ##
@@ -97,9 +256,48 @@ def wireframe_overlay(img, model, plot=True):
     else:
         return fig, ax 
 
-###############################
-## TRAJECTORY ANALYSIS PLOTS ##
-###############################
+################################
+## TRAJECTORY ATTRIBUTE PLOTS ##
+################################
+
+def locs_per_frame(axes, tracks, n_frames=None, kernel=5,
+    fontsize=10, title=None):
+    """
+    Plot the number of localizations per frame.
+
+    args
+    ----
+        axes        :   matplotlib.axes.Axes
+        tracks      :   pandas.DataFrame
+        n_frames    :   int, the number of frames in the
+                        movie. If *None*, defaults to the 
+                        maximum frame in *tracks*
+        kernel      :   float, size of uniform kernel used
+                        for smoothing
+
+    returns
+    -------
+        None
+
+    """
+    if n_frames is None:
+        n_frames = int(tracks["frame"].max()) + 1
+    frame_indices = np.arange(0, n_frames+1)
+    H = np.histogram(
+        tracks["frame"],
+        bins=frame_indices,
+    )[0].astype(np.float64)
+    if kernel > 0:
+        H = ndi.uniform_filter(H, kernel)
+    axes.plot(frame_indices[:-1], H, color="k")
+    axes.set_xlabel("Frame", fontsize=fontsize)
+    axes.set_ylabel("Spots per frame", fontsize=fontsize)
+    if not title is None:
+        axes.set_title(title, fontsize=fontsize)
+
+############################
+## JUMP LENGTH HISTOGRAMS ##
+############################
 
 def plotRadialDisps(radial_disps, bin_edges, frame_interval=0.00548, plot=True):
     """
@@ -252,7 +450,11 @@ def plotRadialDispsBar(radial_disps, bin_edges, frame_interval=0.00548,
     if plot:
         plt.show(); plt.close()
     else:
-        return fig, ax 
+        return fig, ax
+
+###################
+## MISCELLANEOUS ##
+###################
 
 def plot_pixel_mean_variance(means, variances, origin_files=None,
     model_gain=None, model_bg=None):
@@ -311,8 +513,103 @@ def plot_pixel_mean_variance(means, variances, origin_files=None,
 
     plt.tight_layout(); plt.show(); plt.close()
 
+###################################
+## MULTI-FILE PLOTTING FUNCTIONS ##
+###################################
 
+def imlocdensities(*csv_files, out_png=None, filenames=False, **kwargs):
+    """
+    For each of a set of CSV files, make a KDE for localization
+    density. This is a wrapper around imlocdensity().
 
+    If *out_png* is passed, this function saves the result to a file.
+    Otherwise it plots to the screen.
+
+    args
+    ----
+        csv_files       :   variadic str, a set of CSV files
+        out_png         :   str, save filename
+        filenames       :   str, include the filenames as the
+                            plot title
+        kwargs          :   keyword arguments to imlocdensity().
+                            See that function's docstring for
+                            more info. These include: ymax, xmax,
+                            bin_size, kernel, vmax_perc, cmap,
+                            pixel_size_um, scalebar
+
+    """
+    n = len(csv_files)
+    if n == 0:
+        print("quot.plot.imlocdensities: no files passed")
+        return 
+
+    # Number of subplots on an edge
+    m = int(np.ceil(np.sqrt(n)))
+
+    mx = m 
+    my = n // m + 1
+
+    # Lay out the main plot
+    fig, ax = plt.subplots(my, mx, figsize=(3*mx, 3*my))
+
+    # Make localization density plots for each file
+    for i, csv_file in enumerate(csv_files):
+        tracks = pd.read_csv(csv_file)
+        imlocdensity(ax[i//mx, i%mx], tracks, **kwargs)
+
+        # Set filename as plot title if desired
+        if filenames:
+            ax[i//mx, i%mx].set_title(csv_file, fontsize=8)
+
+    # Set the remainder of the plots to invisible
+    for i in range(n, my*mx):
+        kill_ticks(ax[i//mx, i%mx])
+
+    # Save or show
+    if not out_png is None:
+        wrapup(out_png)
+    else:
+        plt.tight_layout(); plt.show(); plt.close()
+
+def locs_per_frame_files(*csv_files, out_png=None, **kwargs):
+    """
+    Given a set of trajectory CSVs, make a plot where each subpanel
+    shows the number of localizations in that file as a function of
+    time. 
+
+    args
+    ----
+        csv_files       :   variadic str, paths to CSVs
+        out_png         :   str, save file
+        kwargs          :   to locs_per_frame()
+
+    """
+    n = len(csv_files)
+    if n == 0:
+        print("quot.plot.locs_per_frame_files: no files passed")
+        return 
+
+    # Number of subplots on an edge
+    m = int(np.ceil(np.sqrt(n)))
+
+    mx = m 
+    my = n//m + 1
+
+    # Make the plot
+    fig, ax = plt.subplots(my, mx, figsize=(mx*3, my*1.5))
+    for i, csv_file in enumerate(csv_files):
+        tracks = pd.read_csv(csv_file)
+        locs_per_frame(ax[i//mx, i%mx], tracks, title=csv_file, **kwargs)
+
+    # Set unused subplots to blank
+    for i in range(n, my*mx):
+        kill_ticks(ax[i//mx, i%mx])
+
+    # Save or show
+    if not out_png is None:
+        wrapup(out_png)
+    else:
+        plt.tight_layout(); plt.show(); plt.close()
 
 
 
