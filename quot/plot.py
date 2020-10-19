@@ -299,6 +299,117 @@ def locs_per_frame(axes, tracks, n_frames=None, kernel=5,
 ## JUMP LENGTH HISTOGRAMS ##
 ############################
 
+def plot_jump_pdfs(axes, tracks, n_frames=4, pixel_size_um=0.16, bin_size=0.02,
+    norm=True, frame_interval=0.00748, fontsize=10, cmap="viridis",
+    start_frame=0, max_jumps_per_track=4, use_entire_track=False, **kwargs):
+    """
+    Plot the empirical jump length probability density function.
+
+    args
+    ----
+        axes            :   matplotlib.axes.Axes
+        tracks          :   pandas.DataFrame
+        n_frames        :   int, the maximum number of frame 
+                            intervals to consider
+        pixel_size_um   :   float, size of pixels in um
+        bin_size        :   float, size of the bins to use in 
+                            the plotted histogram
+        norm            :   bool, normalize to a PDF
+        frame_interval  :   float, frame interval in seconds
+        fontsize        :   int
+        cmap            :   str
+        start_frame     :   int, disregard jumps before this frame
+        max_jumps_per_track     :   int, the maximum number of jumps
+                                    to consider from any one track
+        use_entire_track:   bool, use all jumps from every track
+        kwargs          :   to rad_disp_histogram_2d
+
+    """
+    if start_frame > 0:
+        tracks = tracks[tracks["frame"] >= start_frame]
+
+    # Make the complete jump length histogram
+    H, bin_edges = rad_disp_histogram_2d(tracks, n_frames=n_frames,
+        pixel_size_um=pixel_size_um, use_entire_track=use_entire_track,
+        max_jumps_per_track=max_jumps_per_track, **kwargs)
+
+    # Aggregate histogram bins
+    factor = int(bin_size // 0.001)
+    H, bin_edges = coarsen_histogram(H, bin_edges, factor)
+    bin_size = bin_edges[1] - bin_edges[0]
+    bin_c = bin_edges[:-1] + bin_size * 0.5
+
+    if norm:
+        H = H.astype(np.float64)
+        for frame_idx in range(n_frames):
+            if H[frame_idx, :].sum() > 0:
+                H[frame_idx, :] = H[frame_idx, :] / H[frame_idx, :].sum()
+
+    # Plot
+    colors = hex_cmap(cmap, n_frames+2)
+    for frame_idx in range(n_frames):
+        axes.plot(bin_c, H[frame_idx, :], color=colors[frame_idx],
+            label="$\Delta t = $ %.4f sec" % (frame_interval * (frame_idx+1)))
+    axes.set_xlabel("2D radial jump ($\mu$m)", fontsize=fontsize)
+    axes.set_ylabel("Frequency")
+    axes.legend(frameon=False, loc="upper right", prop={'size': 8})
+
+def plot_jump_cdfs(axes, tracks, n_frames=4, pixel_size_um=0.16,
+    frame_interval=0.00748, fontsize=10, cmap="viridis", 
+    start_frame=0, max_jumps_per_track=4, use_entire_track=False, 
+    linewidth=1, plot_max_r=None, **kwargs):
+    """
+    Plot the empirical jump length probability cumulative
+    distribution function.
+
+    args
+    ----
+        axes            :   matplotlib.axes.Axes
+        tracks          :   pandas.DataFrame
+        n_frames        :   int, the maximum number of frame 
+                            intervals to consider
+        pixel_size_um   :   float, size of pixels in um
+        bin_size        :   float, size of the bins to use in 
+                            the plotted histogram
+        frame_interval  :   float, frame interval in seconds
+        fontsize        :   int
+        cmap            :   str
+        start_frame     :   int, disregard jumps before this frame
+        max_jumps_per_track     :   int, the maximum number of jumps
+                                    to consider from any one track
+        use_entire_track:   bool, use all jumps from every track
+        linewidth       :   int, width of the lines
+        plot_max_r      :   float, the maximum jump length to show
+                            in the plot
+        kwargs          :   to rad_disp_histogram_2d
+
+    """
+    if start_frame > 0:
+        tracks = tracks[tracks['frame'] >= start_frame]
+    H, bin_edges = rad_disp_histogram_2d(tracks, n_frames=n_frames,
+        pixel_size_um=pixel_size_um, max_jumps_per_track=max_jumps_per_track,
+        use_entire_track=use_entire_track, **kwargs)
+    H = H.astype(np.float64)
+    cdfs = np.cumsum(H, axis=1)
+    for i in range(n_frames):
+        cdfs[i,:] = cdfs[i,:] / cdfs[i,-1]
+
+    colors = hex_cmap(cmap, n_frames+2)
+    for i in range(n_frames):
+        axes.plot(bin_edges[1:], cdfs[i,:], color=colors[i],
+            linewidth=linewidth,
+            label="$\Delta t = $ %.4f sec" % (frame_interval * (i+1)))
+
+    axes.set_xlabel("2D radial jump ($\mu$m)", fontsize=fontsize)
+    axes.set_ylabel("CDF")
+    axes.legend(frameon=False, loc="lower right", prop={'size': 8})
+    if not plot_max_r is None:
+        axes.set_xlim((axes.get_xlim()[0], plot_max_r))
+
+# rad_disp_histogram_2d(tracks, n_frames=4, bin_size=0.001, 
+#     max_jump=5.0, pixel_size_um=0.160, n_gaps=0, use_entire_track=False,
+#     max_jumps_per_track=10)
+
 def plotRadialDisps(radial_disps, bin_edges, frame_interval=0.00548, plot=True):
     """
     Plot a set of radial displacement histograms as a simple line plot.
@@ -513,6 +624,52 @@ def plot_pixel_mean_variance(means, variances, origin_files=None,
 
     plt.tight_layout(); plt.show(); plt.close()
 
+##########################
+## ANGULAR DISTRIBUTION ##
+##########################
+
+def angular_dist(axes, tracks, min_disp=0.2, n_bins=50, norm=True,
+    pixel_size_um=0.16):
+    """
+    Plot the angular distribution of displacements for a 
+    set of trajectories.
+
+    args
+    ----
+        axes        :   matplotlib.axes.Axes
+        tracks      :   pandas.DataFrame
+        min_disp    :   float, the minimum displacement required
+                        to consider a displacement for an angle
+                        in um
+        n_bins      :   int, number of histogram bins
+        norm        :   bool, normalize histogram
+        pixel_size_um   :   float, size of pixels in um
+
+    returns
+    -------
+        None, plots directly to *axes*
+
+    """
+    # Calculate angles
+    angles = bond_angles(tracks, min_disp=min_disp/pixel_size_um)
+
+    # Make a histogram
+    bin_edges = np.linspace(0, np.pi, n_bins+1)
+    bin_size = bin_edges[1] - bin_edges[0]
+    bin_c = bin_edges[:-1] + bin_size * 0.5
+    H = np.histogram(angles, bins=bin_edges)[0]
+
+    if norm:
+        H = H.astype(np.float64) / H.sum()
+
+    # Plot
+    bars = axes.bar(bin_c, H, color="w", edgecolor="k",
+        width=bin_size, bottom=np.pi/(n_bins*4))
+    axes.set_yticklabels([])
+    axes.set_thetamin(0)
+    axes.set_thetamax(180)
+
+
 ###################################
 ## MULTI-FILE PLOTTING FUNCTIONS ##
 ###################################
@@ -611,6 +768,351 @@ def locs_per_frame_files(*csv_files, out_png=None, **kwargs):
     else:
         plt.tight_layout(); plt.show(); plt.close()
 
+def jump_cdf_files(*csv_files, out_png=None, **kwargs):
+    """
+    For each of a set of trajectory CSVs, plot the jump
+    length CDFs.
+
+    args
+    ----
+        csv_files       :   list of str, paths to CSV files
+        out_png         :   str, output plot file
+        kwargs          :   to plot_jump_cdfs(). These include:
+                            n_frames, pixel_size_um, frame_interval,
+                            fontsize, cmap, start_frame,
+                            max_jumps_per_track, use_entire_track,
+                            linewidth
+
+    returns
+    -------
+        None; either plots to screen or saves depending
+            on whether *out_png* is set
+
+    """
+    n = len(csv_files)
+    if n == 0:
+        print("quot.plot.jump_cdfs_files: no files passed")
+        return 
+
+    m = int(np.ceil(np.sqrt(n)))
+    mx = m 
+    my = n//m + 1
+
+    fig, ax = plt.subplots(my, mx, figsize=(4*mx, 2*my))
+    for i, csv_file in enumerate(csv_files):
+        tracks = pd.read_csv(csv_file)
+        plot_jump_cdfs(ax[i//mx, i%mx], tracks, **kwargs)
+        ax[i//mx, i%mx].set_title(csv_file, fontsize=10)
+
+    for i in range(n, my*mx):
+        kill_ticks(ax[i//mx, i%mx])
+
+    if not out_png is None:
+        wrapup(out_png)
+    else:
+        plt.tight_layout(); plt.show(); plt.close()
+
+def angular_dist_files(*csv_files, out_png=None, start_frame=0,
+    filenames=False, **kwargs):
+    """
+    For each of a set of trajectory CSVs, plot the angular
+    distribution of displacements.
+
+    args
+    ----
+        csv_files       :   variadic str, paths to CSV files
+        start_frame     :   int, the first frame in the file
+                            consider
+        out_png         :   str, save path
+        kwargs          :   to angular_dist(). These include:
+                            min_disp (um), n_bins, norm,
+                            pixel_size_um
+
+    returns
+    -------
+        None
+
+    """
+    n = len(csv_files)
+    if n == 0:
+        print("quot.plot.angular_dist_files: no files passed")
+        return 
+
+    m = int(np.ceil(np.sqrt(n)))
+    mx = m 
+    my = n//m + 1
+
+    fig = plt.figure(figsize=(3*mx, 2*my))
+    axes = []
+    for i in range(n):
+        ax = fig.add_subplot(my, mx, i+1,
+            projection="polar")
+        axes.append(ax)
+
+    for i, csv_file in enumerate(csv_files):
+        tracks = pd.read_csv(csv_file)
+        tracks = tracks[tracks["frame"] >= start_frame]
+        angular_dist(axes[i], tracks, **kwargs)
+        if filenames:
+            axes[i].set_title(csv_file, fontsize=10)
+
+    if not out_png is None:
+        wrapup(out_png)
+    else:
+        plt.tight_layout(); plt.show(); plt.close()
+
+
+#######################
+## RELATED UTILITIES ##
+#######################
+
+def track_length(tracks):
+    """
+    Given a set of trajectories in DataFrame format, create
+    a new columns ("track_length") with the length of the 
+    corresponding trajectory in frames.
+
+    args
+    ----
+        tracks      :   pandas.DataFrame
+
+    returns
+    -------
+        pandas.DataFrame, with the new column
+
+    """
+    if "track_length" in tracks.columns:
+        tracks = tracks.drop("track_length", axis=1)
+    tracks = tracks.join(
+        tracks.groupby("trajectory").size().rename("track_length"),
+        on="trajectory"
+    )
+    return tracks 
+
+def rad_disp_histogram_2d(tracks, n_frames=4, bin_size=0.001, 
+    max_jump=5.0, pixel_size_um=0.160, n_gaps=0, use_entire_track=False,
+    max_jumps_per_track=10):
+    """
+    Compile a histogram of radial displacements in the XY plane for 
+    a set of trajectories ("tracks").
+
+    Identical with strobemodels.utils.rad_disp_histogram_2d.
+
+    args
+    ----
+        tracks          :   pandas.DataFrame
+        n_frames        :   int, the number of frame delays to consider.
+                            A separate histogram is compiled for each
+                            frame delay.
+        bin_size        :   float, the size of the bins in um. For typical
+                            experiments, this should not be changed because
+                            some diffusion models (e.g. Levy flights) are 
+                            contingent on the default binning parameters.
+        max_jump        :   float, the max radial displacement to consider in 
+                            um
+        pixel_size_um   :   float, the size of individual pixels in um
+        n_gaps          :   int, the number of gaps allowed during tracking
+        use_entire_track:   bool, use every displacement in the dataset
+        max_jumps_per_track:   int, the maximum number of displacements
+                            to consider per trajectory. Ignored if 
+                            *use_entire_track* is *True*.
+
+    returns
+    -------
+        (
+            2D ndarray of shape (n_frames, n_bins), the distribution of 
+                displacements at each time point;
+            1D ndarray of shape (n_bins+1), the edges of each bin in um
+        )
+
+    """
+    # Sort by trajectory, then frame
+    tracks = tracks.sort_values(by=["trajectory", "frame"])
+
+    # Assign track lengths
+    if "track_length" not in tracks.columns:
+        tracks = track_length(tracks)
+
+    # Filter out unassigned localizations and singlets
+    T = tracks[
+        np.logical_and(tracks["trajectory"]>=0, tracks["track_length"]>1)
+    ][["frame", "trajectory", "y", "x"]]
+
+    # Convert to ndarray for speed
+    T = np.asarray(T[["frame", "trajectory", "y", "x", "trajectory"]]).astype(np.float64)
+
+    # Sort first by track, then by frame
+    T = T[np.lexsort((T[:,0], T[:,1])), :]
+
+    # Convert from pixels to um
+    T[:,2:4] = T[:,2:4] * pixel_size_um 
+
+    # Format output histogram
+    bin_edges = np.arange(0.0, max_jump+bin_size, bin_size)
+    n_bins = bin_edges.shape[0]-1
+    H = np.zeros((n_frames, n_bins), dtype=np.int64)
+
+    # Consider gap frames
+    if n_gaps > 0:
+
+        # The maximum trajectory length, including gap frames
+        max_len = (n_gaps + 1) * n_frames + 1
+
+        # Consider every shift up to the maximum trajectory length
+        for l in range(1, max_len+1):
+
+            # Compute the displacement for all possible jumps
+            diff = T[l:,:] - T[:-l,:]
+
+            # Map the trajectory index corresponding to the first point in 
+            # each trajectory
+            diff[:,4] = T[l:,1]
+
+            # Only consider vectors between points originating from the same track
+            diff = diff[diff[:,1] == 0.0, :]
+
+            # Look for jumps corresponding to each frame interval being considered
+            for t in range(1, n_frames+1):
+
+                # Find vectors that match the delay being considered
+                subdiff = diff[diff[:,0] == t, :]
+
+                # Only consider a finite number of displacements from each trajectory
+                if not use_entire_track:
+                    _df = pd.DataFrame(subdiff[:,4], columns=["traj"])
+                    _df["ones"] = 1
+                    _df["index_in_track"] = _df.groupby("traj")["ones"].cumsum() 
+                    subdiff = subdiff[np.asarray(_df["index_in_track"]) <= max_jumps_per_track, :]
+
+                # Calculate radial displacements
+                r_disps = np.sqrt((subdiff[:,2:4]**2).sum(axis=1))
+                H[t-1,:] = H[t-1,:] + np.histogram(r_disps, bins=bin_edges)[0]
+
+    # No gap frames
+    else:
+
+        # For each frame interval and each track, calculate the vector change in position
+        for t in range(1, n_frames+1):
+            diff = T[t:,:] - T[:-t,:]
+
+            # Map trajectory indices back to the first localization of each trajectory
+            diff[:,4] = T[t:,1]
+
+            # Only consider vectors between points originating in the same track
+            diff = diff[diff[:,1] == 0.0, :]
+
+            # Only consider vectors that match the delay being considered
+            diff = diff[diff[:,0] == t, :]
+
+            # Only consider a finite number of displacements from each trajectory
+            if not use_entire_track:
+                _df = pd.DataFrame(diff[:,4], columns=["traj"])
+                _df["ones"] = 1
+                _df["index_in_track"] = _df.groupby("traj")["ones"].cumsum()
+                diff = diff[np.asarray(_df["index_in_track"]) <= max_jumps_per_track, :]
+
+            # Calculate radial displacements
+            r_disps = np.sqrt((diff[:,2:4]**2).sum(axis=1))
+            H[t-1,:] = np.histogram(r_disps, bins=bin_edges)[0]
+
+    return H, bin_edges 
+
+def coarsen_histogram(jump_length_histo, bin_edges, factor):
+    """
+    Given a jump length histogram with many small bins, aggregate into a 
+    histogram with a small number of larger bins.
+
+    This is useful for visualization.
+
+    args
+    ----
+        jump_length_histo       :   2D ndarray, the jump length histograms
+                                    indexed by (frame interval, jump length bin)
+        bin_edges               :   1D ndarray, the edges of each jump length
+                                    bin in *jump_length_histo*
+        factor                  :   int, the number of bins in the old histogram
+                                    to aggregate for each bin of the new histogram
+
+    returns
+    -------
+        (
+            2D ndarray, the aggregated histogram,
+            1D ndarray, the edges of each jump length bin the aggregated histogram
+        )
+
+    """
+    # Get the new set of bin edges
+    n_frames, n_bins_orig = jump_length_histo.shape 
+    bin_edges_new = bin_edges[::factor]
+    n_bins_new = bin_edges_new.shape[0] - 1
+
+    # May need to truncate the histogram at the very end, if *factor* doesn't
+    # go cleanly into the number of bins in the original histogram
+    H_old = jump_length_histo[:, (bin_edges<bin_edges_new[-1])[:-1]]
+
+    # Aggregate the histogram
+    H = np.zeros((n_frames, n_bins_new), dtype=jump_length_histo.dtype)
+    for j in range(factor):
+        H = H + H_old[:, j::factor]
+
+    return H, bin_edges_new 
+
+def bond_angles(tracks, min_disp=0.2):
+    """
+    Return the angles between subsequent displacements for a 
+    set of trajectories. Angles between pi and 2 * pi are 
+    reflected onto the interval 0, pi.
+
+    args
+    ----
+        tracks      :   pandas.DataFrame
+        min_disp    :   float, discard displacements less than
+                        this displacement. This prevents us from
+                        being biased by localization error.
+
+    returns
+    -------
+        1D ndarray of shape (n_angles,), the observed
+            angles in radians (from 0 to pi)
+
+    """
+    tracks = track_length(tracks)
+    T = np.asarray(
+        tracks[(tracks["trajectory"] >= 0) & (tracks["track_length"] > 2)][
+            ["trajectory", "frame", "y", "x"]
+        ]
+    )
+    if T.shape[0] == 0:
+        return np.nan
+
+    traj_indices = np.unique(T[:, 0])
+    n_angles = T.shape[0] - 2 * len(traj_indices)
+    angles = np.zeros(n_angles, dtype="float64")
+
+    c = 0
+    for i, j in enumerate(traj_indices):
+        traj = T[T[:, 0] == j, 2:]
+        disps = traj[1:, :] - traj[:-1, :]
+        mags = np.sqrt((disps ** 2).sum(axis=1))
+        traj_angles = (disps[1:, :] * disps[:-1, :]).sum(axis=1) / (mags[1:] * mags[:-1])
+
+        # Only take angles above a given displacement, if desired
+        traj_angles = traj_angles[(mags[1:] >= min_disp) & (mags[:-1] >= min_disp)]
+
+        # Aggregate
+        n_traj_angles = traj_angles.shape[0]
+        angles[c : c + n_traj_angles] = traj_angles
+        c += n_traj_angles
+
+    # We'll lose some angles because of the min_disp cutoff
+    angles = angles[:c]
+
+    # Some floatint point errors occur here - values slightly
+    # greater than 1.0 or less than -1.0
+    angles[angles > 1.0] = 1.0 
+    angles[angles < -1.0] = -1.0 
+
+    return np.arccos(angles[~pd.isnull(angles)])
 
 
 
