@@ -13,6 +13,7 @@ setuptools.setup(
 	entry_points = {
 		'console_scripts': [
 			'quot=quot.gui.__main__:cli',
+            'quot-track=quot.__main__:batch_track'
 		],
 	},
 )

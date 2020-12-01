@@ -117,7 +117,7 @@ def track_file(path, out_csv=None, progress_bar=True, **kwargs):
 
     return locs 
 
-def track_files(paths, num_workers=4, save=True, **kwargs):
+def track_files(paths, num_workers=4, save=True, out_dir=None, **kwargs):
     """
     Run tracking on several files using parallelization.
 
@@ -128,6 +128,7 @@ def track_files(paths, num_workers=4, save=True, **kwargs):
         save        :   bool, save the output to CSVs files. The names
                         for these CSVs are generated from the names of 
                         the corresponding image files.
+        out_dir     :   str, output directory
         kwargs      :   tracking configuration, as read with 
                         quot.io.read_config
 
@@ -137,10 +138,19 @@ def track_files(paths, num_workers=4, save=True, **kwargs):
             file
 
     """
+    # Create the output directory if it does not already exist
+    if (not out_dir is None) and (not os.path.isdir(out_dir)):
+        os.mkdir(out_dir)
+
     # Tracking function for one file with lazy evaluation
     @dask.delayed 
     def driver(path):
-        if save:
+        if save and (not out_dir is None):
+            out_csv = os.path.join(
+                out_dir,
+                "{}_trajs.csv".format(os.path.splitext(os.path.basename(path))[0])
+            )
+        elif save and (out_dir is None):
             out_csv = "{}_trajs.csv".format(os.path.splitext(path)[0])
         else:
             out_csv = None 
@@ -165,7 +175,7 @@ def track_files(paths, num_workers=4, save=True, **kwargs):
     return results 
 
 def track_directory(path, ext='.nd2', num_workers=4, save=True, contains=None,
-    **kwargs):
+    out_dir=None, **kwargs):
     """
     Find all image files in a directory and run 
     localization and tracking.
@@ -180,6 +190,7 @@ def track_directory(path, ext='.nd2', num_workers=4, save=True, contains=None,
                         files
         contains    :   str, a substring that all image files 
                         are required to contain
+        out_dir     :   str, directory for output CSV files
         kwargs      :   configuration
 
     returns
@@ -201,7 +212,8 @@ def track_directory(path, ext='.nd2', num_workers=4, save=True, contains=None,
         image_paths = [j for j in image_paths if contains in os.path.basename(j)]
 
     # Run tracking and localization
-    track_files(image_paths, num_workers=num_workers, save=save, **kwargs)
+    track_files(image_paths, num_workers=num_workers, save=save, 
+        out_dir=out_dir, **kwargs)
 
 def retrack_file(path, out_csv=None, **kwargs):
     """

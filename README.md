@@ -64,36 +64,38 @@ Other `quot` commands are mostly shortcuts to lower-level GUIs. For example, to 
 
 Exactly how each step is performed can be specified with a config file. `quot` uses Tom's Obvious, Minimal Language (TOML) format.
 
-`sample_config.toml` is a `quot` configuration file. To use these settings to run localization and tracking on a Nikon ND2 file:
-
+An example SPT movie and config file are in the `quot/samples` directory.
+To run the example, navigate to the `quot/samples` directory and run
 ```
-    from quot import read_config, track_file
-
-    # Specify target (ND2 and TIF files supported)
-    target_path = "samples/sample_movie.tif"
-
-    # Read the configuration
-    config = read_config("samples/sample_config.toml")
-
-    # Run localization and tracking on the file
-    locs = track_file(target_path, **config)
+    quot-track sample_movie.tif sample_config.toml -o sample_trajs.csv
 ```
 
-Batch tracking can also be run on directories with SPT movies using the `track_directory` command:
+The result should be saved to `samples/sample_trajs.csv`.
 
+`quot-track` can also be used for batch tracking on directories with 
+many image files. For example, suppose we have the following directory
+structure:
 ```
-    from quot import track_directory
+  -> my_config.toml
+  -> directory_with_nd2_files
+     -> file_1.nd2
+     -> file_2.nd2 
+     -> file_3.nd2
+```
 
-    # Run localization and tracking on each ND2 file in 
-    # this directory, saving results as CSVs
-    track_directory(
-        "path/to/ND2/files",  # directory containing image files
-        ext=".nd2",           # extension of target image files
-        num_workers=4,        # number of threads to use
-        save=True,            # save results to CSVs
-        **config              # experimental configuration
-    )
+To run batch tracking on all of the files in `directory_with_nd2_files`,
+you could do:
+```
+    quot-track directory_with_nd2_files my_config.toml -o output_directory -n 3
+```
 
+The resulting `.csv` files will be placed in `output_directory` and will be
+named based on their parent ND2 file. The `-n` (equivalently, `--n_threads`)
+argument specifies how many threads to run in parallel.
+
+As always, to get a full list of the options to `quot-track`, use
+```
+    quot-track --help
 ```
 
 ## Finding external hard drives
