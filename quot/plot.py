@@ -629,10 +629,16 @@ def plot_pixel_mean_variance(means, variances, origin_files=None,
 ##########################
 
 def angular_dist(axes, tracks, min_disp=0.2, n_bins=50, norm=True,
-    pixel_size_um=0.16):
+    pixel_size_um=0.16, bottom=0.02):
     """
     Plot the angular distribution of displacements for a 
     set of trajectories.
+
+    Note that *axes* must be generated with projection = "polar".
+    For instance, 
+
+        fig = plt.figure()
+        axes = fig.add_subplot(projection="polar")
 
     args
     ----
@@ -659,15 +665,22 @@ def angular_dist(axes, tracks, min_disp=0.2, n_bins=50, norm=True,
     bin_c = bin_edges[:-1] + bin_size * 0.5
     H = np.histogram(angles, bins=bin_edges)[0]
 
-    if norm:
+    if norm and H.sum() > 0:
         H = H.astype(np.float64) / H.sum()
 
     # Plot
     bars = axes.bar(bin_c, H, color="w", edgecolor="k",
-        width=bin_size, bottom=np.pi/(n_bins*4))
+        width=bin_size, bottom=bottom)
+    axes.plot(bin_c, [bottom for i in range(n_bins)],
+        color="k", linewidth=1) 
+    yt = np.asarray(axes.get_yticks())
+    axes.set_yticks(yt[yt>=bottom])
     axes.set_yticklabels([])
     axes.set_thetamin(0)
     axes.set_thetamax(180)
+    axes.set_xticks([0, np.pi/3, 2*np.pi/3, np.pi])
+    axes.set_ylim((0, 1.1*axes.get_ylim()[1]))
+
 
 
 ###################################

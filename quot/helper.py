@@ -3,6 +3,10 @@
 quot.helper.py -- low-level utilities
 
 """
+# Paths
+import os
+from glob import glob 
+
 # Numeric
 import numpy as np 
 
@@ -185,6 +189,50 @@ def tracked_mat_to_csv(path, out_csv=None, pixel_size_um=0.16):
         df.to_csv(out_csv, index=False)
 
     return df
+
+def load_tracks_dir(dirname, suffix="trajs.csv", start_frame=0,
+    min_track_len=1):
+    """
+    Load all of the trajectory files in a target directory
+    into a single pandas.DataFrame.
+
+    args
+    ----
+        dirname         :   str, directory containing track CSVs
+        suffix          :   str, extension for the track CSVs
+        start_frame     :   int, exclude all trajectories before
+                            this frame
+        min_track_len   :   int, the minimum trajectory length to 
+                            include
+
+    returns
+    -------
+        pandas.DataFrame
+
+    """
+    # Find target files
+    if os.path.isdir(dirname):
+        target_csvs = glob(os.path.join(dirname, "*{}".format(suffix)))
+        if len(target_csvs) == 0:
+            raise RuntimeError("quot.helper.load_tracks_dir: could not find " \
+                "trajectory CSVs in directory {}".format(dirname))
+    elif os.path.isfile(dirname):
+        target_csvs = [dirname]
+
+    # Concatenate trajectories
+    tracks = [pd.read_csv(j) for j in target_csvs]
+    tracks = concat_tracks(*tracks)
+
+    # Exclude points before the start frame
+    tracks = tracks[tracks["frame"] >= start_frame]
+
+    # Exclude trajectories that are too short
+    tracks = track_length(tracks)
+    if min_track_len > 1:
+        tracks = tracks[tracks["track_length"] >= min_track_len]
+
+    return tracks 
+
 
 ###############
 ## DETECTION ##
@@ -1442,6 +1490,27 @@ def concat_tracks(*tracks):
 
     return out 
     
+def track_length(tracks):
+    """
+    Generate a new column with the trajectory length in frames.
+
+    args
+    ----
+        tracks  :   pandas.DataFrame
+
+    returns
+    -------
+        pandas.DataFrame, the input dataframe with a new 
+            column "track_length"
+
+    """
+    if "track_length" in tracks.columns:
+        tracks = tracks.drop("track_length", axis=1)
+    tracks = tracks.join(
+        tracks.groupby("trajectory").size().rename("track_length"),
+        on="trajectory"
+    )
+    return tracks 
 
 #######################
 ## MASKING UTILITIES ##

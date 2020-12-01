@@ -53,6 +53,10 @@ def localize_file(path, out_csv=None, progress_bar=True, **kwargs):
     assert os.path.isfile(path), "quot.__main__.localize_file: " \
         "file %s does not exist" % path 
 
+    # If the config file does not contain a "filter" section,
+    # don't worry about it
+    kwargs["filter"] = kwargs.get("filter", {})
+
     # Open an image file reader with some filtering
     # settings, if desired
     with ChunkFilter(path, **kwargs['filter']) as f:
