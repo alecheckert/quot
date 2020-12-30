@@ -78,7 +78,7 @@ class Masker(QDialog):
 
 
     """
-    def __init__(self, image_path, max_points_freestyle=20, dialog_mode=False, parent=None):
+    def __init__(self, image_path, max_points_freestyle=40, dialog_mode=False, parent=None):
 
         super(Masker, self).__init__(parent=parent)
         self.image_path = image_path 
@@ -823,3 +823,30 @@ def show_mask_assignments(point_sets, locs, mask_col="mask_index",
     except AttributeError:
         pass 
 
+def reconstruct_mask(mask_csv, shape):
+    """
+    Given a mask CSV of the type produced by B_save_callback in Masker,
+    produce a binary mask on some pixel grid.
+
+    args
+    ----
+        mask_csv        :   str, path to CSV
+        shape           :   2-tuple of int, the shape of the output image
+
+    returns
+    -------
+        2D ndarray of dtype bool, the binary masks
+
+    """
+    mask_df = pd.read_csv(mask_csv)
+    mask_indices = mask_df["mask_index"].unique()
+    result = np.zeros(shape, dtype=np.bool)
+    Y, X = np.indices(shape)
+    YX = np.zeros((shape[0] * shape[1], 2))
+    YX[:,0] = Y.ravel()
+    YX[:,1] = X.ravel()
+    for mask_index in mask_indices:
+        mask = mask_df.loc[mask_df["mask_index"] == mask_index]
+        p = Path(np.asarray(mask[['y', 'x']]), closed=True)
+        result = np.logical_or(result, p.contains_points(YX).reshape(shape))
+    return result 

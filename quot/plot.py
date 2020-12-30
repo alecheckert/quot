@@ -628,8 +628,8 @@ def plot_pixel_mean_variance(means, variances, origin_files=None,
 ## ANGULAR DISTRIBUTION ##
 ##########################
 
-def angular_dist(axes, tracks, min_disp=0.2, n_bins=50, norm=True,
-    pixel_size_um=0.16, bottom=0.02):
+def angular_dist(axes, tracks, min_disp=0.2, delta=1, n_bins=50, norm=True,
+    pixel_size_um=0.16, bottom=0.02, angle_ticks=True):
     """
     Plot the angular distribution of displacements for a 
     set of trajectories.
@@ -647,9 +647,16 @@ def angular_dist(axes, tracks, min_disp=0.2, n_bins=50, norm=True,
         min_disp    :   float, the minimum displacement required
                         to consider a displacement for an angle
                         in um
+        delta       :   int, the number of subsequent jumps over
+                        which to calculate the angle. For example,
+                        if *delta* is 1, then angles are calculated
+                        between subsequent jumps in a trajectory.
+                        If *delta* is 2, then angles are calculated
+                        between jump n and jump n+2, etc.
         n_bins      :   int, number of histogram bins
         norm        :   bool, normalize histogram
         pixel_size_um   :   float, size of pixels in um
+        angle_ticks :   bool, do tick labels for the angles
 
     returns
     -------
@@ -657,7 +664,7 @@ def angular_dist(axes, tracks, min_disp=0.2, n_bins=50, norm=True,
 
     """
     # Calculate angles
-    angles = bond_angles(tracks, min_disp=min_disp/pixel_size_um)
+    angles = bond_angles(tracks, min_disp=min_disp/pixel_size_um, delta=delta)
 
     # Make a histogram
     bin_edges = np.linspace(0, np.pi, n_bins+1)
@@ -679,6 +686,8 @@ def angular_dist(axes, tracks, min_disp=0.2, n_bins=50, norm=True,
     axes.set_thetamin(0)
     axes.set_thetamax(180)
     axes.set_xticks([0, np.pi/3, 2*np.pi/3, np.pi])
+    if not angle_ticks:
+        axes.set_xticklabels([])
     axes.set_ylim((0, 1.1*axes.get_ylim()[1]))
 
 
@@ -1070,18 +1079,24 @@ def coarsen_histogram(jump_length_histo, bin_edges, factor):
 
     return H, bin_edges_new 
 
-def bond_angles(tracks, min_disp=0.2):
+def bond_angles(tracks, min_disp=0.2, delta=1):
     """
-    Return the angles between subsequent displacements for a 
-    set of trajectories. Angles between pi and 2 * pi are 
-    reflected onto the interval 0, pi.
+    Return the set of angles between jumps originating from 
+    trajectories. Angles between pi and 2 * pi are reflected onto
+    the interval 0, pi.
 
     args
     ----
         tracks      :   pandas.DataFrame
-        min_disp    :   float, discard displacements less than
+        min_disp    :   float, pixels. Discard displacements less than
                         this displacement. This prevents us from
                         being biased by localization error.
+        delta       :   int, the proximity of the two jumps with
+                        respect to which the angle is calculated.
+                        For example, if *delta* is 1, then the angle
+                        between subsequent jumps is calculated. 
+                        If *delta* is 2, then the angle between 
+                        jump n and jump n+2 is calculated, and so on.
 
     returns
     -------
@@ -1089,28 +1104,49 @@ def bond_angles(tracks, min_disp=0.2):
             angles in radians (from 0 to pi)
 
     """
+    assert delta > 0, "delta must be greater than 0 (passed: {})".format(delta)
+
+    # Get the set of all trajectories with at least three points
+    # as an ndarray
     tracks = track_length(tracks)
     T = np.asarray(
-        tracks[(tracks["trajectory"] >= 0) & (tracks["track_length"] > 2)][
+        tracks[(tracks["trajectory"] >= 0) & (tracks["track_length"] > (1+delta))][
             ["trajectory", "frame", "y", "x"]
         ]
     )
     if T.shape[0] == 0:
         return np.nan
 
+    # Ascending trajectory and frame indices
+    tracks = tracks.sort_values(by=["trajectory", "frame"])
+
+    # Unique trajectory indices
     traj_indices = np.unique(T[:, 0])
+
+    # Largest number of possible angles
     n_angles = T.shape[0] - 2 * len(traj_indices)
+
+    # Output array
     angles = np.zeros(n_angles, dtype="float64")
 
+    # Iterate through all trajectories
     c = 0
     for i, j in enumerate(traj_indices):
+
+        # The set of y, x points corresponding to this trajectory
         traj = T[T[:, 0] == j, 2:]
+
+        # Jumps between subsequent frames
         disps = traj[1:, :] - traj[:-1, :]
+
+        # Jump moduli
         mags = np.sqrt((disps ** 2).sum(axis=1))
-        traj_angles = (disps[1:, :] * disps[:-1, :]).sum(axis=1) / (mags[1:] * mags[:-1])
+
+        # Angles between subsequent jumps
+        traj_angles = (disps[delta:, :] * disps[:-delta, :]).sum(axis=1) / (mags[delta:] * mags[:-delta])
 
         # Only take angles above a given displacement, if desired
-        traj_angles = traj_angles[(mags[1:] >= min_disp) & (mags[:-1] >= min_disp)]
+        traj_angles = traj_angles[(mags[delta:] >= min_disp) & (mags[:-delta] >= min_disp)]
 
         # Aggregate
         n_traj_angles = traj_angles.shape[0]
@@ -1120,14 +1156,9 @@ def bond_angles(tracks, min_disp=0.2):
     # We'll lose some angles because of the min_disp cutoff
     angles = angles[:c]
 
-    # Some floatint point errors occur here - values slightly
+    # Some floating point errors occur here - values slightly
     # greater than 1.0 or less than -1.0
     angles[angles > 1.0] = 1.0 
     angles[angles < -1.0] = -1.0 
 
     return np.arccos(angles[~pd.isnull(angles)])
-
-
-
-
-

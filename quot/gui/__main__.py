@@ -117,6 +117,7 @@ def track(image_path, locs_path, **kwargs):
 
 @cli.command()
 @click.argument('image_path', type=str)
+@click.option("-m", "--max_points_freestyle", type=int, default=20, help="default 20")
 def mask(image_path, **kwargs):
     """
     Draw 2D masks on an movie or image
