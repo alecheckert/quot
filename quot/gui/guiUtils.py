@@ -11,6 +11,10 @@ import os
 # Numeric
 import numpy as np 
 
+# File reader
+from nd2reader import ND2Reader 
+import tifffile 
+
 # Main GUI utilities
 import PySide2
 from PySide2.QtCore import Qt, QSize, QRectF
@@ -115,6 +119,83 @@ def coerce_type(arg, type_):
         return bool(arg)
     elif type_ is str:
         return str(arg)
+
+#####################
+## FILE CONVERTERS ## 
+#####################
+
+def split_channels_nd2(nd2_path, out_dir=None):
+    """
+    Split all of the channels in an ND2 image into separate TIF files.
+
+    args
+    ----
+        nd2_path        :   str, path to an ND2 file
+        out_dir         :   str, path to a directory in which to save 
+                            the output TIF files. If *None*, defaults to
+                            the same directory as the input.
+
+    returns
+    -------
+        list of 3D ndarray with shape (n_frames, n_pixels_y, n_pixels_x),
+            the various channels of the image
+
+    """
+    # Check user input
+    assert os.path.isfile(nd2_path), "file {} does not exist".format(nd2_path)
+    assert os.path.splitext(nd2_path)[1] == ".nd2", "file {} is not an ND2 file".format(nd2_path)
+
+    # Create a file reader
+    reader = ND2Reader(nd2_path)
+
+    # Get the number of frames
+    n_frames = reader.metadata.get("total_images_per_channel", 1)
+
+    # Get the number of channels. Since the ND2 metadata is unreliable, 
+    # here we forcibly try to retrieve channels from the file and stop when
+    # we run into an error.
+    n_channels = 0
+    while 1:
+        try:
+            frame = reader.get_frame_2D(t=0, c=n_channels)
+            n_channels += 1
+        except ValueError:
+            break
+
+    # Get the shape of the image
+    N, M = reader.get_frame_2D(t=0, c=0).shape 
+
+    # Format the output paths
+    if not out_dir is None:
+        assert os.path.isdir(out_dir), "directory {} does not exist".format(out_dir)
+        basename = os.path.splitext(os.path.basename(nd2_path))[0]
+        basepath = os.path.join(out_dir, basename)
+    else:
+        basepath = os.path.splitext(nd2_path)[0]
+
+    # Store references to the channel arrays, in case the user wants them
+    refs = []
+
+    # Convert each channel to TIF
+    for channel in range(n_channels):
+
+        # Read this channel into an ndarray
+        imstack = np.zeros((n_frames, N, M), dtype=np.uint16)
+        for frame in range(n_frames):
+            imstack[frame,:,:] = reader.get_frame_2D(t=frame, c=channel)
+
+        # Save 
+        tifffile.imsave(
+            "{}_channel_{}.tif".format(basepath, channel),
+            imstack
+        )
+
+        refs.append(imstack)
+
+    # Close file reader
+    reader.close()
+
+    return refs 
 
 #############
 ## WIDGETS ##

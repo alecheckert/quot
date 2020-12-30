@@ -8,6 +8,7 @@ import sys
 
 # File paths
 import os 
+from glob import glob 
 
 # Main GUI utilities
 import PySide2
@@ -16,7 +17,13 @@ from PySide2.QtWidgets import QApplication, QWidget, QLabel, \
     QPushButton, QVBoxLayout
 
 # Custom GUI utilities
-from .guiUtils import set_dark_app, getOpenFilePath
+from .guiUtils import (
+    set_dark_app,
+    getOpenFilePath,
+    getOpenDirectory,
+    split_channels_nd2,
+    SingleComboBoxDialog
+)
 from .imageViewer import ImageViewer 
 from .detectViewer import DetectViewer 
 from .spotViewer import SpotViewer 
@@ -71,7 +78,8 @@ class Launcher(QWidget):
             ("Batch localize", self.launch_batch_localizer),
             ("Attribute viewer", self.launch_attribute_viewer),
             ("Simple masker", self.launch_masker),
-            ("Mask interpolator", self.launch_mask_interpolator)
+            ("Mask interpolator", self.launch_mask_interpolator),
+            ("Split channels", self.split_channels)
         ]
         self.buttons = []
         for i, (label, callback) in enumerate(button_ids):
@@ -246,6 +254,49 @@ class Launcher(QWidget):
 
         """
         V = MaskInterpolator(parent=self)
+
+    def split_channels(self):
+        """
+        Split ND2 files into TIF files, one for each channel.
+
+        """
+        # Single ND2 file or directory of ND2 files?
+        ex = SingleComboBoxDialog("Single ND2 file or directory?", 
+            options=["Single ND2 file", "Directory with ND2 files"],
+            title="Select input type", parent=self)
+        ex.exec_()
+
+        # Dialog accepted
+        if ex.result() == 1:
+            path = ex.return_val
+        else:
+            return 
+
+        if ex.return_val == "Single ND2 file":
+
+            # Prompt the user to enter a file
+            path = getOpenFilePath(self, "Select image file to split",
+                "ND2 files (*.nd2)", initialdir=self.currdir)
+
+            # Split this file
+            split_channels_nd2(path, out_dir=None)
+
+            # Give an indication of completion
+            print("Successfully split channels for file {}".format(path))
+
+        elif ex.return_val == "Directory with ND2 files":
+
+            # Prompt the user to enter a directory
+            dirname = getOpenDirectory(self, "Select directory with ND2 files", 
+                initialdir=self.currdir)
+
+            # Get all ND2 files in this directory
+            nd2_paths = glob(os.path.join(dirname, "*.nd2"))
+
+            # Split all ND2 files
+            for nd2_path in nd2_paths:
+                split_channels_nd2(nd2_path, out_dir=None)
+                print("Successfully split channels for file {}".format(nd2_path))
 
 def init_launcher():
     """

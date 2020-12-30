@@ -11,6 +11,7 @@ import pyqtgraph
 # Paths
 import sys
 import os 
+from glob import glob 
 
 # CLI
 import click 
@@ -26,7 +27,7 @@ from .masker import Masker
 from .maskInterpolator import MaskInterpolator
 
 # Custom GUI utilities
-from .guiUtils import set_dark_app
+from .guiUtils import set_dark_app, split_channels_nd2
 
 def launch_gui(gui, *args, **kwargs):
     """
@@ -132,6 +133,33 @@ def mask_interpolator(**kwargs):
 
     """
     launch_gui(MaskInterpolator, **kwargs)
+
+@cli.command()
+@click.argument("path", type=str)
+@click.option("-o", "--out_dir", default=None, type=str, help="default input directory")
+def split_channels(path, out_dir):
+    """
+    Split ND2 files into TIF files for each channel.
+
+    """
+    # If the output directory is passed and does not exist, make it
+    if (not out_dir is None) and (not os.path.isdir(out_dir)):
+        os.mkdir(out_dir)
+        
+    # If the input is a directory, get every ND2 file in this directory and
+    # split them all
+    if os.path.isdir(path):
+        nd2_paths = glob(os.path.join(path, "*.nd2"))
+        for nd2_path in nd2_paths:
+            split_channels_nd2(nd2_path, out_dir=out_dir)
+
+    # If the input is a file, split this file
+    elif os.path.isfile(path) and os.path.splitext(path)[1] == ".nd2":
+        split_channels_nd2(path, out_dir=out_dir)
+
+    # Incompatible input
+    else:
+        raise RuntimeError("path {} is not a directory or ND2 file".format(path))
 
 if __name__ == '__main__':
     cli()
