@@ -25,6 +25,7 @@ from .attributeViewer import AttributeViewer
 from .trackViewer import TrackViewer 
 from .masker import Masker 
 from .maskInterpolator import MaskInterpolator
+from .spectralViewer import SpectralViewer 
 
 # Custom GUI utilities
 from .guiUtils import set_dark_app, split_channels_nd2
@@ -133,6 +134,17 @@ def mask_interpolator(**kwargs):
 
     """
     launch_gui(MaskInterpolator, **kwargs)
+
+@cli.command()
+@click.argument("image_path", type=str)
+@click.option("-s", "--start_frame", type=int, default=0, help="default 0")
+@click.option("-p", "--pixel_size_um", type=float, default=0.16, help="default 0.16")
+def spectral(image_path, **kwargs):
+    """
+    Visualize the power spectrum of an image.
+
+    """
+    launch_gui(SpectralViewer, image_path, **kwargs)
 
 @cli.command()
 @click.argument("path", type=str)
