@@ -9,25 +9,27 @@
 # Spot detection settings
 [detect]
     method = "llr"
-    k = 1.0
-    w = 9
+    k = 1.2
+    w = 15
     t = 18.0
 
 # Subpixel localization settings
 [localize]
     method = 'ls_int_gaussian'
     window_size = 9
-    sigma = 1.0
-    ridge = 0.001
+    sigma = 1.2
+    ridge = 0.0001
     max_iter = 10
     damp = 0.3
+    camera_gain = 109.0
+    camera_bg = 470.0
 
 # Tracking settings
 [track]
-    method = 'euclidean'
-    pixel_size_um = 0.183
-    frame_interval = 0.01048
-    search_radius = 2.5
+    method = 'conservative'
+    pixel_size_um = 0.160
+    frame_interval = 0.00748
+    search_radius = 1.0
     max_blinks = 0
     min_I0 = 0.0
     scale = 7.0
