@@ -275,6 +275,6 @@ class SpectralViewer(QWidget):
         """
         self.reader.close()
         self.win.close()
-        self.close()
+        # self.close()
         event.accept()
 
