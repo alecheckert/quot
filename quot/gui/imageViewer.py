@@ -198,8 +198,3 @@ class ChooseProjectionDialog(QDialog):
 
 
 
-
-
-
-
-

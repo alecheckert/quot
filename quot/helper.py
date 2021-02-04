@@ -1549,3 +1549,68 @@ def get_edges(bin_img):
 
     return out
 
+def get_ordered_mask_points(mask, max_points=100):
+    """
+    Given the edges of a two-dimensional binary mask, construct a line
+    around the mask.
+
+    args
+    ----
+        mask        :   2D ndarray, dtype bool, mask edges as 
+                        returned by get_edges
+        max_points  :   int, the maximum number of points tolerated
+                        in the final mask. If the number of points 
+                        exceeds this, the points are repeatedly 
+                        downsampled until there are fewer than 
+                        max_points.
+
+    returns
+    -------
+        2D ndarray of shape (n_points, 2), the points belonging
+            to this ROI
+
+    """
+    # Get the X and Y coordinates of all points in the mask edge
+    points = np.asarray(mask.nonzero()).T
+
+    # Keep track of which points we've included so far
+    included = np.zeros(points.shape[0], dtype=np.bool)
+
+    # Start at the first point
+    ordered_points = np.zeros(points.shape, dtype=points.dtype)
+    ordered_points[0,:] = points[0,:]
+    included[0] = True 
+
+    # Index of the current point
+    c = 0
+    midx = 0
+
+    # Find the closest point to the current point
+    while c < points.shape[0]-1:
+
+        # Compute distances to every other point
+        distances = np.sqrt(((points[midx,:]-points)**2).sum(axis=1))
+
+        # Set included points to impossible distances
+        distances[included] = np.inf 
+
+        # Among the points not yet included in *ordered_points*,
+        # choose the one closest to the current point
+        midx = np.argmin(distances)
+
+        # Add this point to the set of ordered points
+        ordered_points[c+1,:] = points[midx, :]
+
+        # Mark this point as included
+        included[midx] = True 
+
+        # Increment the current point counter
+        c += 1
+
+    # Downsample until there are fewer than max_points
+    while ordered_points.shape[0] > max_points:
+        ordered_points = ordered_points[::2,:]
+
+    return ordered_points
+
+
