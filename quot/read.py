@@ -236,21 +236,25 @@ class ImageReader(object):
             )
         return self._shape 
 
-    def get_frame(self, frame_index):
+    def get_frame(self, frame_index, c=0):
         """
         Return a single frame from the file.
 
         args
             frame_index     :   int
+            c               :   int, channel index. Currently only 
+                                implemented for ND2 files.
 
         returns
             2D ndarray (YX)
 
         """
         assert self._frame_valid(frame_index)
-        if self.ext == '.nd2':
+        if (self.ext == ".nd2") and (c == 0):
             return self._reader.get_frame_2D(t=frame_index)
-        elif self.ext == '.tif':
+        elif (self.ext == ".nd2") and (c > 0):
+            return self._reader.get_frame_2D(t=frame_index, c=c)
+        elif (self.ext == ".tif"):
             return self._reader.pages[frame_index].asarray()
 
     def get_frame_range(self, start, stop):
