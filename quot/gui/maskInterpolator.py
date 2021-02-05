@@ -471,7 +471,7 @@ def show_mask_assignments(point_sets, locs, mask_col="mask_index",
     # Generate localization density
     y_bins = np.arange(y_max+1)
     x_bins = np.arange(x_max+1)
-    H, _, _ = np.histogram2d(locs['x'], locs['y'], bins=(x_bins, y_bins))
+    H, _, _ = np.histogram2d(locs['y'], locs['x'], bins=(y_bins, x_bins))
     H = ndi.gaussian_filter(H, 5.0)
 
     # The set of points to use for the scatter plot
@@ -479,7 +479,7 @@ def show_mask_assignments(point_sets, locs, mask_col="mask_index",
         print("Only plotting %d/%d localizations..." % (max_points_scatter, len(locs)))
         L = np.asarray(locs[:max_points_scatter][["y", "x", mask_col]])
     else:
-        L = np.asarray(locs[["x", "y", mask_col]])
+        L = np.asarray(locs[["y", "x", mask_col]])
 
     # Categorize each localization as either (1) assigned or (2) not assigned
     # to a mask
@@ -502,18 +502,18 @@ def show_mask_assignments(point_sets, locs, mask_col="mask_index",
     ax[0].set_ylim((0, y_max))
     ax[0].set_aspect("equal")
 
-    ax[1].imshow(H.T, cmap='gray', origin="lower")
+    ax[1].imshow(H, cmap='gray', origin="lower")
     ax[2].scatter(
-        L[inside, 0],
         L[inside, 1],
+        L[inside, 0],
         c=densities[inside],
         cmap="viridis",
         norm=norm,
         s=30
     )
     ax[2].scatter(
-        L[outside, 0],
         L[outside, 1],
+        L[outside, 0],
         cmap="magma",
         c=densities[outside],
         norm=norm,
