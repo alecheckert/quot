@@ -1,0 +1,37 @@
+# Stock configuration file
+
+# Image reading and filtering settings
+[filter]
+    start = 0
+    method = "identity"
+    chunk_size = 10
+
+# Spot detection settings
+[detect]
+    method = "llr"
+    k = 1.5
+    w = 21
+    t = 16.0
+
+# Subpixel localization settings
+[localize]
+    method = 'ls_int_gaussian'
+    window_size = 9
+    sigma = 1.5
+    ridge = 0.0001
+    convergence = 0.0001
+    divergence = 1.0
+    max_iter = 10
+    damp = 0.3
+    camera_bg = 0.0
+    camera_gain = 1.0
+
+# Tracking settings
+[track]
+    method = 'euclidean'
+    pixel_size_um = 0.160
+    frame_interval = 0.00748
+    search_radius = 1.0
+    max_blinks = 0
+    min_I0 = 0.0
+    scale = 7.0

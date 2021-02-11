@@ -5,7 +5,9 @@ __main__.py -- launch batch analyses from the command line
 """
 import os
 import click
-from .read import read_config
+from shutil import copyfile
+
+from .read import read_config, save_config
 from .core import track_directory, track_file
 
 ACCEPTABLE_EXTS = [".nd2", ".tif", ".tiff"]
@@ -87,6 +89,20 @@ def batch_track(target_dir, config_path, ext, n_threads,
 
     else:
         raise RuntimeError("No file or directory: {}".format(target_dir))
+
+@click.command()
+@click.argument("config_path", type=str)
+def make_naive_config(config_path):
+    """
+    Save a naive config file with some stock settings to a target
+    path. 
+
+    """
+    src = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        "stock_config.toml"
+    )
+    copyfile(src, config_path)
 
 if __name__ == "__main__":
     batch_track()
