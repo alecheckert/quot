@@ -575,7 +575,8 @@ METHODS = {
 
 def track(locs, method="diffusion", search_radius=2.5, 
     pixel_size_um=0.16, frame_interval=0.00548, min_I0=0.0,
-    max_blinks=0, debug=False, max_spots_per_frame=None, **kwargs):
+    max_blinks=0, debug=False, max_spots_per_frame=None,
+    reindex_unassigned=True, **kwargs):
     """
     Given a dataframe with localizations, reconnect into 
     trajectories.
@@ -837,6 +838,15 @@ def track(locs, method="diffusion", search_radius=2.5,
     locs['trajectory'] = ids 
     locs['subproblem_n_traj'] = subproblem_sizes_traj
     locs['subproblem_n_locs'] = subproblem_sizes_locs
+
+    # For localizations unassigned to any trajectory, assign
+    # unique trajectory indices
+    if reindex_unassigned:
+        max_index = locs["trajectory"].max() + 1
+        unassigned = locs["trajectory"] == -1 
+        n_unassigned = unassigned.sum()
+        locs.loc[unassigned, "trajectory"] = np.arange(
+            max_index, max_index+n_unassigned)
 
     # If desired, return the Trajectory objects for testing
     if debug:
