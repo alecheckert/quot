@@ -52,7 +52,8 @@ from .guiUtils import (
     IntSlider,
     getSaveFilePath,
     getOpenFilePath,
-    getTextInputs
+    getTextInputs,
+    SingleComboBoxDialog
 )
 
 # Mask selector
@@ -347,7 +348,7 @@ class MaskInterpolator(QWidget):
                 pen=(255, 165, 28)
             )
 
-    def apply_masks(self):
+    def apply_masks(self, mode="single_point"):
         """
         Apply the currently defined masks to a set of localizations.
 
@@ -386,6 +387,21 @@ class MaskInterpolator(QWidget):
         locs["mask_index"] = interpolator(locs[['y', 'x']], locs['frame'],
             progress_bar=True)
         print(locs["mask_index"].unique())
+
+        if mode == "single_point":
+            locs = locs.join(
+                locs.groupby("trajectory")["mask_index"].max().rename("_mask_index"),
+                on="trajectory"
+            )
+            locs["mask_index"] = locs["_mask_index"]
+            locs = locs.drop("_mask_index", axis=1)
+        elif mode == "all_points":
+            locs = locs.join(
+                (locs.groupby("trajectory")["mask_index"].nunique() != 1).rename("_cross_border"),
+                on="trajectory"
+            )
+            locs.loc[locs["_cross_border"], "mask_index"] = 0
+            locs = locs.drop("_cross_border", axis=1)
 
         # Save to the same file
         print("Saving masked localizations to new files...")
@@ -437,7 +453,19 @@ class MaskInterpolator(QWidget):
         self.generate_masks(1, trial_interpolate=True, plot=True)
 
     def B_apply_callback(self):
-        self.apply_masks()
+
+        # Prompt the user to select the way to apply masks
+        options = ["by_localization", "single_point", "all_points"]
+        box = SingleComboBoxDialog("Method by which trajectories are assigned to masks",
+            options, init_value="single_point", title="Assignment mode", parent=self)
+        box.exec_()
+        if box.Accepted:
+            mode = box.return_val 
+        else:
+            print("Dialog not accepted")
+            return 
+
+        self.apply_masks(mode=mode)
 
 def show_mask_assignments(point_sets, locs, mask_col="mask_index",
     max_points_scatter=5000):
