@@ -480,7 +480,7 @@ def reconnect_hungarian(trajs, locs, locs_array, max_blinks=0,
             elif (j<n_locs) and (i>=n_traj):
                 if locs[j,4] >= min_I0:
                     out.append(Trajectory(locs[j,0], locs_array,
-                        (n_traj,n_locs)))
+                        (n_traj,n_locs), max_blinks=max_blinks))
             else:
                 pass
 
@@ -680,7 +680,7 @@ def track(locs, method="diffusion", search_radius=2.5,
     # Start by grabbing the locs in the first frame and 
     # initializing Trajectories from each of them 
     frame_locs = get_locs(start_frame)
-    active = [Trajectory(int(i), L, (0,1)) for i in frame_locs[:,0]]
+    active = [Trajectory(int(i), L, (0,1), max_blinks) for i in frame_locs[:,0]]
 
     # During tracking, Trajectories are tossed between 
     # three categories: "active", "new", and "completed". 
@@ -729,7 +729,7 @@ def track(locs, method="diffusion", search_radius=2.5,
         elif len(active)==0:
 
             for i in frame_locs[frame_locs[:,4]>=min_I0, 0]:
-                new.append(Trajectory(int(i), L, (0,1)))
+                new.append(Trajectory(int(i), L, (0,1), max_blinks))
             active = new 
             new = []
 
@@ -784,7 +784,7 @@ def track(locs, method="diffusion", search_radius=2.5,
             # a new trajectory if it passes the intensity threshold
             for li in loc_singlets:
                 if frame_locs[li,4] >= min_I0:
-                    new.append(Trajectory(frame_locs[li,0], L, (0,1)))
+                    new.append(Trajectory(frame_locs[li,0], L, (0,1), max_blinks))
 
             # If there are both trajectories and localizations in the 
             # subproblem, reconnect according to the reconnection method
