@@ -1,4 +1,4 @@
-name: quot_env_v2
+name: quot_env_v3
 channels:
   - conda-forge
 dependencies:
