@@ -1,0 +1,30 @@
+name: quot_env_v2
+channels:
+  - conda-forge
+dependencies:
+  - python=3.9
+  - dask
+  - distributed
+  - ipython
+  - ipywidgets
+  - jupyterlab
+  - matplotlib
+  - munkres
+  - nd2reader=3.2.1
+  - nodejs
+  - nose2
+  - numba
+  - numpy
+  - pandas
+  - pip
+  - pytables
+  - seaborn
+  - scikit-image
+  - scipy
+  - tifffile
+  - toml
+  - tqdm
+  - xmltodict
+  - yaml
+  - pyside6
+  - pyqtgraph
