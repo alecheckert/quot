@@ -1510,7 +1510,7 @@ def getSaveFilePath(parent, title, default, filetypes,
     dialog_options = QFileDialog.Options()
     dialog_options |= QFileDialog.DontUseNativeDialog
     path, filetype = QFileDialog.getSaveFileName(
-        parent=q, caption=title, # default=default,
+        parent=q, caption=title,
         filter=filetypes, dir=initialdir, options=dialog_options)
     return path 
 
