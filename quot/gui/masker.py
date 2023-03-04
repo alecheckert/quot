@@ -41,10 +41,10 @@ from ..helper import (
 from ..helper import tracked_mat_to_csv
 
 # Core GUI utilities
-import PySide2
-from PySide2 import QtCore
-from PySide2.QtCore import Qt 
-from PySide2.QtWidgets import QWidget, QLabel, QPushButton, \
+import PySide6
+from PySide6 import QtCore
+from PySide6.QtCore import Qt 
+from PySide6.QtWidgets import QWidget, QLabel, QPushButton, \
     QVBoxLayout, QGridLayout, QDialog 
 
 # pyqtgraph plotting utilities
@@ -607,7 +607,7 @@ def inside_mask(points, locs, mode="single_point"):
         )
         locs["inside_mask"] = locs["inside_mask_by_track"]
         locs = locs.drop("inside_mask_by_track", axis=1)       
-    locs_inside = np.asarray(locs["inside_mask"]).astype(np.bool)
+    locs_inside = np.asarray(locs["inside_mask"]).astype(bool)
     locs = locs.drop("inside_mask", axis=1)
     return locs_inside 
 
@@ -783,7 +783,7 @@ def reconstruct_mask(mask_csv, shape):
     """
     mask_df = pd.read_csv(mask_csv)
     mask_indices = mask_df["mask_index"].unique()
-    result = np.zeros(shape, dtype=np.bool)
+    result = np.zeros(shape, dtype=bool)
     Y, X = np.indices(shape)
     YX = np.zeros((shape[0] * shape[1], 2))
     YX[:,0] = Y.ravel()

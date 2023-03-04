@@ -7,12 +7,12 @@ ImageViewer.py -- a simple viewer for image movies
 from ..read import ImageReader
 
 # Core GUI utilities
-import PySide2
-from PySide2.QtCore import Qt 
-from PySide2.QtWidgets import QWidget, QGridLayout, \
-    QPushButton, QDialog, QLabel, QLineEdit, QShortcut
-from PySide2.QtGui import QKeySequence
-from PySide2.QtGui import Qt as QtGui_Qt
+import PySide6
+from PySide6.QtCore import Qt 
+from PySide6.QtWidgets import QWidget, QGridLayout, \
+    QPushButton, QDialog, QLabel, QLineEdit
+from PySide6.QtGui import QKeySequence, QShortcut
+from PySide6.QtGui import Qt as QtGui_Qt
 
 # pyqtgraph utilities for showing images
 from pyqtgraph import ImageView 

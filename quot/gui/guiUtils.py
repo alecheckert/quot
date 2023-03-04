@@ -14,19 +14,19 @@ import numpy as np
 # File reader
 from nd2reader import ND2Reader 
 import tifffile 
+from collections import OrderedDict
 
 # Main GUI utilities
-import PySide2
-from PySide2.QtCore import Qt, QSize, QRectF
-from PySide2.QtGui import QPalette, QColor, QPainterPath
-from PySide2.QtWidgets import QFileDialog, QSlider, QWidget, \
+import PySide6
+from PySide6.QtCore import Qt, QSize, QRectF
+from PySide6.QtGui import QPalette, QColor, QPainterPath
+from PySide6.QtWidgets import QFileDialog, QSlider, QWidget, \
     QGridLayout, QVBoxLayout, QLabel, QPushButton, QLineEdit, \
     QDialog, QComboBox 
 
 # pyqtgraph utilities
 from pyqtgraph import ImageView, GraphicsLayoutWidget, RectROI, \
     ImageItem, GraphicsView, GraphicsLayout 
-from pyqtgraph.pgcollections import OrderedDict 
 
 # Master color for all ROIs, spot overlays, etc.
 # Potentially good: #88BDF6, #00DBAB
@@ -38,7 +38,7 @@ MASTER_COLOR = '#88BDF6'
 
 def set_dark_app(qApp):
     """
-    Set the color scheme of a PySide2 QApplication to 
+    Set the color scheme of a PySide6 QApplication to 
     a darker default, inherited by all children. 
 
     Modifies the QApplication in place.
@@ -1435,7 +1435,7 @@ def getTextInputs(item_labels, defaults, title=None):
 
 def getOpenFilePath(parent, title, filetypes, initialdir=''):
     """
-    Wrapper for PySide2.QtWidgets.QFileDialog.getOpenFileName.
+    Wrapper for PySide6.QtWidgets.QFileDialog.getOpenFileName.
     Prompt the user to select a single file of a particular
     extension.
 
@@ -1461,7 +1461,7 @@ def getOpenFilePath(parent, title, filetypes, initialdir=''):
 
 def getOpenFilePaths(parent, title, filetypes, initialdir=''):
     """
-    Wrapper for PySide2.QtWidgets.QFileDialog.getOpenFileNames.
+    Wrapper for PySide6.QtWidgets.QFileDialog.getOpenFileNames.
     Prompt the user to select one or more files of a particular
     extension.
 
@@ -1488,7 +1488,7 @@ def getOpenFilePaths(parent, title, filetypes, initialdir=''):
 def getSaveFilePath(parent, title, default, filetypes, 
     initialdir=''):
     """
-    Wrapper for PySide2.QtWidgets.QFileDialog.getSaveFileName.
+    Wrapper for PySide6.QtWidgets.QFileDialog.getSaveFileName.
     Prompt the user to select a file that doesn't exist to save
     to.
 
@@ -1510,13 +1510,13 @@ def getSaveFilePath(parent, title, default, filetypes,
     dialog_options = QFileDialog.Options()
     dialog_options |= QFileDialog.DontUseNativeDialog
     path, filetype = QFileDialog.getSaveFileName(
-        parent=q, caption=title, default=default,
+        parent=q, caption=title, # default=default,
         filter=filetypes, dir=initialdir, options=dialog_options)
     return path 
 
 def getOpenDirectory(parent, title, initialdir=''):
     """
-    Wrapper for PySide2.QtWidgets.QFileDialog.getExistingDirectory.
+    Wrapper for PySide6.QtWidgets.QFileDialog.getExistingDirectory.
     Prompt the user to select a directory and return its 
     path as a string.
 

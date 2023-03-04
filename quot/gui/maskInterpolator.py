@@ -38,10 +38,10 @@ from ..helper import (
 from quot.mask import MaskInterpolator as QuotMaskInterpolator
 
 # Core GUI utilities
-import PySide2
-from PySide2 import QtCore
-from PySide2.QtCore import Qt 
-from PySide2.QtWidgets import QWidget, QLabel, QPushButton, \
+import PySide6
+from PySide6 import QtCore
+from PySide6.QtCore import Qt 
+from PySide6.QtWidgets import QWidget, QLabel, QPushButton, \
     QVBoxLayout, QGridLayout, QApplication, QDialog 
 
 # pyqtgraph plotting utilities

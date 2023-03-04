@@ -10,12 +10,12 @@ import numpy as np
 from ..read import ImageReader 
 
 # Core GUI utilities
-import PySide2
-from PySide2.QtCore import Qt 
-from PySide2.QtWidgets import QApplication, QWidget, QLabel, \
-    QPushButton, QGridLayout, QVBoxLayout, QDialog, QShortcut
-from PySide2.QtGui import Qt as QtGui_Qt
-from PySide2.QtGui import QKeySequence
+import PySide6
+from PySide6.QtCore import Qt 
+from PySide6.QtWidgets import QApplication, QWidget, QLabel, \
+    QPushButton, QGridLayout, QVBoxLayout, QDialog
+from PySide6.QtGui import Qt as QtGui_Qt
+from PySide6.QtGui import QKeySequence, QShortcut
 
 from pyqtgraph import ImageView 
 
@@ -65,7 +65,7 @@ class SpectralViewer(QWidget):
         self.max_freq = int(np.ceil(self.rfreq.max()))
 
         # Filter
-        self.take_freqs = np.ones(self.rfreq.shape, dtype=np.bool)
+        self.take_freqs = np.ones(self.rfreq.shape, dtype=bool)
 
         # The actual substrate for showing / filtering
         self.I = self.mean_proj.copy()

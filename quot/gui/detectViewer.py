@@ -25,12 +25,12 @@ from ..chunkFilter import ChunkFilter
 from ..findSpots import detect 
 
 # Core GUI utilities
-import PySide2
-from PySide2.QtCore import Qt 
-from PySide2.QtWidgets import QApplication, QWidget, QLabel, \
-    QPushButton, QGridLayout, QVBoxLayout, QDialog, QShortcut
-from PySide2.QtGui import Qt as QtGui_Qt
-from PySide2.QtGui import QKeySequence
+import PySide6
+from PySide6.QtCore import Qt 
+from PySide6.QtWidgets import QApplication, QWidget, QLabel, \
+    QPushButton, QGridLayout, QVBoxLayout, QDialog
+from PySide6.QtGui import Qt as QtGui_Qt
+from PySide6.QtGui import QKeySequence, QShortcut
 
 # pyqtgraph utilities for rendering images and spots
 from pyqtgraph import ImageView, ScatterPlotItem 
