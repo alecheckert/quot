@@ -10,6 +10,23 @@ setuptools.setup(
 	author="Alec Heckert",
 	author_email="aheckert@berkeley.edu",
 	description="GUI for single molecule tracking",
+    install_requires=[
+        "dask",
+        "matplotlib",
+        "munkres",
+        "nd2reader==3.2.1",
+        "nose2",
+        "numpy",
+        "pandas",
+        "scikit-image",
+        "scipy",
+        "seaborn",
+        "tifffile",
+        "toml",
+        "tqdm",
+        "pyqtgraph",
+        "pyside6",
+    ],
 	entry_points = {
 		'console_scripts': [
 			'quot=quot.gui.__main__:cli',
