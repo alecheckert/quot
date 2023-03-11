@@ -1453,7 +1453,7 @@ def getOpenFilePath(parent, title, filetypes, initialdir=''):
     """
     q = QWidget(parent)
     dialog_options = QFileDialog.Options()
-    dialog_options |= QFileDialog.DontUseNativeDialog
+    #dialog_options |= QFileDialog.DontUseNativeDialog
     filepath, filetype = QFileDialog.getOpenFileName(
         parent=q, caption=title, filter=filetypes, 
         dir=initialdir, options=dialog_options)
