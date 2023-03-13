@@ -661,9 +661,10 @@ def apply_masks(point_sets, locs, mode="single_point"):
             did not fall into any mask.
 
     """
-    assigned = np.zeros(len(locs), dtype=np.int64)
+    locs_copy = locs.copy()
+    assigned = np.zeros(len(locs_copy), dtype=np.int64)
     for i, point_set in enumerate(point_sets):
-        assigned[inside_mask(point_set, locs, mode=mode)] = i+1 
+        assigned[inside_mask(point_set, locs_copy, mode=mode)] = i+1 
     return assigned 
 
 def show_mask_assignments(point_sets, locs, mask_col="mask_index",
