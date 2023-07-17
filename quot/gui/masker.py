@@ -515,11 +515,11 @@ class Masker(QDialog):
         box = SingleComboBoxDialog("Method by which trajectories are assigned to masks",
             options, init_value="single_point", title="Assignment mode", parent=self)
         box.exec_()
-        if box.Accepted:
-            mode = box.return_val 
+        if box.result() == 1:
+            mode = box.return_val
         else:
             print("Dialog not accepted")
-            return 
+            return
 
         # Assign each localization to one of the current masks
         point_sets = [self.getPoints(p) for p in self.polyLineROIs]
