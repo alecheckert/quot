@@ -41,10 +41,10 @@ from ..helper import (
 from ..helper import tracked_mat_to_csv
 
 # Core GUI utilities
-import PySide2
-from PySide2 import QtCore
-from PySide2.QtCore import Qt 
-from PySide2.QtWidgets import QWidget, QLabel, QPushButton, \
+import PySide6
+from PySide6 import QtCore
+from PySide6.QtCore import Qt 
+from PySide6.QtWidgets import QWidget, QLabel, QPushButton, \
     QVBoxLayout, QGridLayout, QDialog 
 
 # pyqtgraph plotting utilities
@@ -515,11 +515,11 @@ class Masker(QDialog):
         box = SingleComboBoxDialog("Method by which trajectories are assigned to masks",
             options, init_value="single_point", title="Assignment mode", parent=self)
         box.exec_()
-        if box.Accepted:
-            mode = box.return_val 
+        if box.result() == 1:
+            mode = box.return_val
         else:
             print("Dialog not accepted")
-            return 
+            return
 
         # Assign each localization to one of the current masks
         point_sets = [self.getPoints(p) for p in self.polyLineROIs]
@@ -607,7 +607,7 @@ def inside_mask(points, locs, mode="single_point"):
         )
         locs["inside_mask"] = locs["inside_mask_by_track"]
         locs = locs.drop("inside_mask_by_track", axis=1)       
-    locs_inside = np.asarray(locs["inside_mask"]).astype(np.bool)
+    locs_inside = np.asarray(locs["inside_mask"]).astype(bool)
     locs = locs.drop("inside_mask", axis=1)
     return locs_inside 
 
@@ -661,9 +661,10 @@ def apply_masks(point_sets, locs, mode="single_point"):
             did not fall into any mask.
 
     """
-    assigned = np.zeros(len(locs), dtype=np.int64)
+    locs_copy = locs.copy()
+    assigned = np.zeros(len(locs_copy), dtype=np.int64)
     for i, point_set in enumerate(point_sets):
-        assigned[inside_mask(point_set, locs, mode=mode)] = i+1 
+        assigned[inside_mask(point_set, locs_copy, mode=mode)] = i+1 
     return assigned 
 
 def show_mask_assignments(point_sets, locs, mask_col="mask_index",
@@ -783,7 +784,7 @@ def reconstruct_mask(mask_csv, shape):
     """
     mask_df = pd.read_csv(mask_csv)
     mask_indices = mask_df["mask_index"].unique()
-    result = np.zeros(shape, dtype=np.bool)
+    result = np.zeros(shape, dtype=bool)
     Y, X = np.indices(shape)
     YX = np.zeros((shape[0] * shape[1], 2))
     YX[:,0] = Y.ravel()

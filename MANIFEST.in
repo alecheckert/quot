@@ -1,0 +1,2 @@
+include quot/stock_config.toml
+include quot/gui/CONFIG.toml

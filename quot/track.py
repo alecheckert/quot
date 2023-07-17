@@ -891,7 +891,7 @@ def track_subset(locs, filters, **kwargs):
 
     """
     # Determine which localizations pass the QC filters
-    filter_pass = np.ones(len(locs), dtype=np.bool)
+    filter_pass = np.ones(len(locs), dtype=bool)
     for f in filters:
         filter_pass = np.logical_and(filter_pass, f(locs))
 

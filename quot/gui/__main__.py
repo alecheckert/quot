@@ -4,8 +4,8 @@ __main__.py
 
 """
 # Core GUI utilities
-import PySide2
-from PySide2.QtWidgets import QApplication
+import PySide6
+from PySide6.QtWidgets import QApplication
 import pyqtgraph
 
 # Paths
@@ -40,7 +40,7 @@ def launch_gui(gui, *args, **kwargs):
         gui     :   GUI to launch
 
     """
-    pyqtgraph.Qt.QT_LIB = "PySide2"
+    pyqtgraph.Qt.QT_LIB = "PySide6"
     app = QApplication([])
     set_dark_app(app)
     instance = gui(*args, **kwargs)

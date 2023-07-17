@@ -4,7 +4,7 @@ SpotViewer.py -- overlay spots onto a movie after localization
 
 """
 import sys
-import PySide2
+import PySide6
 
 # File paths
 import os 
@@ -29,11 +29,11 @@ from matplotlib import cm
 from matplotlib import colors as mpl_colors
 
 # Core GUI utilities
-from PySide2.QtCore import Qt 
-from PySide2.QtWidgets import QWidget, QLabel, QPushButton, \
-    QVBoxLayout, QGridLayout, QApplication, QDialog, QShortcut
-from PySide2.QtGui import Qt as QtGui_Qt
-from PySide2.QtGui import QKeySequence
+from PySide6.QtCore import Qt 
+from PySide6.QtWidgets import QWidget, QLabel, QPushButton, \
+    QVBoxLayout, QGridLayout, QApplication, QDialog
+from PySide6.QtGui import Qt as QtGui_Qt, QShortcut
+from PySide6.QtGui import QKeySequence
 
 # pyqtgraph utilities for images and overlays
 from pyqtgraph import ImageView, ScatterPlotItem, GraphItem, \
@@ -204,7 +204,7 @@ class SpotViewer(QWidget):
         self.frame_slider = IntSlider(minimum=0, interval=1, 
             maximum=self.imageReader.n_frames-1, init_value=self.start_frame,
             name='Frame', parent=self.win_left)
-        L_left.addWidget(self.frame_slider, 0, 0, rowSpan=2, 
+        L_left.addWidget(self.frame_slider, 0, 0,
             alignment=widget_align)
         self.frame_slider.assign_callback(self.frame_slider_callback)
 

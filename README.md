@@ -28,6 +28,17 @@ A simple GUI to compare spot detection and tracking methods in single molecule t
 
 `quot` is still in active development. The `develop` option  will track changes in the source files as new versions become available.
 
+## Alternative install with `pip`
+
+In the future `quot` will be installable with `pip` alone. This functionality is currently on the `quot_env_v2` branch. To install via this method, do:
+```
+  git clone https://github.com/alecheckert/quot.git
+  git checkout quot_env_v2
+  cd quot
+  # Make a new venv or something here
+  pip install -e .
+```
+
 ## Run the `quot` GUI
 
 The easiest way to explore SPT options in `quot` is to use the GUI. To launch the GUI, first switch to the `quot` environment:

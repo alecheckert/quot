@@ -23,9 +23,9 @@ from matplotlib import cm
 from matplotlib import colors as mpl_colors 
 
 # Core GUI utilities
-import PySide2
-from PySide2.QtCore import Qt 
-from PySide2.QtWidgets import QApplication, QLabel, QWidget, \
+import PySide6
+from PySide6.QtCore import Qt 
+from PySide6.QtWidgets import QApplication, QLabel, QWidget, \
     QPushButton, QVBoxLayout, QGridLayout, QDialog 
 
 # pyqtgraph plotting utilities

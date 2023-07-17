@@ -11,9 +11,9 @@ import os
 from glob import glob 
 
 # Main GUI utilities
-import PySide2
-from PySide2.QtCore import Qt 
-from PySide2.QtWidgets import QApplication, QWidget, QLabel, \
+import PySide6
+from PySide6.QtCore import Qt 
+from PySide6.QtWidgets import QApplication, QWidget, QLabel, \
     QPushButton, QVBoxLayout
 
 # Custom GUI utilities
@@ -75,7 +75,6 @@ class Launcher(QWidget):
             ("Detection viewer", self.launch_detect_viewer),
             ("Spot viewer", self.launch_spot_viewer),
             ("Track viewer", self.launch_track_viewer),
-            ("Batch localize", self.launch_batch_localizer),
             ("Attribute viewer", self.launch_attribute_viewer),
             ("Simple masker", self.launch_masker),
             ("Mask interpolator", self.launch_mask_interpolator),
@@ -206,9 +205,6 @@ class Launcher(QWidget):
 
         # Launch an instance of TrackViewer
         V = TrackViewer(image_file, path, parent=self)
-
-    def launch_batch_localizer(self):
-        pass 
 
     def launch_attribute_viewer(self):
         """

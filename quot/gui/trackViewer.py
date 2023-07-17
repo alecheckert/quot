@@ -5,7 +5,7 @@ settings in real-time
 
 """
 import sys
-import PySide2
+import PySide6
 
 # File paths
 import os
@@ -27,11 +27,11 @@ from matplotlib import cm
 from matplotlib import colors as mpl_colors 
 
 # Core GUI utilities
-from PySide2.QtCore import Qt 
-from PySide2.QtWidgets import QWidget, QLabel, QPushButton, \
-    QVBoxLayout, QGridLayout, QDialog, QShortcut
-from PySide2.QtGui import Qt as QtGui_Qt 
-from PySide2.QtGui import QKeySequence
+from PySide6.QtCore import Qt 
+from PySide6.QtWidgets import QWidget, QLabel, QPushButton, \
+    QVBoxLayout, QGridLayout, QDialog
+from PySide6.QtGui import Qt as QtGui_Qt 
+from PySide6.QtGui import QKeySequence, QShortcut
 
 # pyqtgraph image display utilities
 from pyqtgraph import ImageView, ScatterPlotItem, GraphItem 

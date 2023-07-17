@@ -1531,7 +1531,7 @@ def get_edges(bin_img):
         2D ndarray, dtype bool, shape shape as bin_img
 
     """
-    assert bin_img.dtype == np.bool, "get_edges: must be bool input"
+    assert bin_img.dtype == bool, "get_edges: must be bool input"
     out = np.zeros(bin_img.shape, dtype="bool")
 
     # Find the edges of the binary mask
@@ -1574,7 +1574,7 @@ def get_ordered_mask_points(mask, max_points=100):
     points = np.asarray(mask.nonzero()).T
 
     # Keep track of which points we've included so far
-    included = np.zeros(points.shape[0], dtype=np.bool)
+    included = np.zeros(points.shape[0], dtype=bool)
 
     # Start at the first point
     ordered_points = np.zeros(points.shape, dtype=points.dtype)

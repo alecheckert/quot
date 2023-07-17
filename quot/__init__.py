@@ -3,8 +3,8 @@
 __init__.py
 
 """
-# Enforce PySide2 backend to pyqtgraph
-import PySide2
+# Enforce PySide6 backend to pyqtgraph
+import PySide6
 import pyqtgraph
 
 # Core functions to run localization and tracking on single files
