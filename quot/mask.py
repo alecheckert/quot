@@ -260,7 +260,7 @@ def shoelace(points):
             *points*
 
     """
-    return ((points[1:,0] - points[:-1,0]) * \
+    return 0.5 * ((points[1:,0] - points[:-1,0]) * \
         (points[1:,1] + points[:-1,1])).sum()
 
 def circshift(points, shift):
