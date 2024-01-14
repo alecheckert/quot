@@ -1,4 +1,4 @@
-name: linux-build-test
+name: quot-tests
 
 on: [push]
 
@@ -14,10 +14,12 @@ jobs:
       uses: actions/setup-python@v3
       with:
         python-version: '3.9'
-    - name: Add conda to system path
+    - name: Initialize conda
       run: |
         # $CONDA is an environment variable pointing to the root of the miniconda directory
         echo $CONDA/bin >> $GITHUB_PATH
+        conda init
+        source ~/.bashrc
     - name: Install dependencies
       run: |
         conda env create -f quot_env.yml
