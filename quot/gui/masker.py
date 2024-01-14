@@ -43,7 +43,7 @@ from ..helper import tracked_mat_to_csv
 # Core GUI utilities
 import PySide6
 from PySide6 import QtCore
-from PySide6.QtCore import Qt 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QWidget, QLabel, QPushButton, \
     QVBoxLayout, QGridLayout, QDialog 
 
@@ -238,8 +238,10 @@ class Masker(QDialog):
         2D ndarray (shape (n_points, 2)).
 
         """
-        state = polyLineROI.getState()
-        return np.asarray([[p.x(), p.y()] for p in state['points']])
+        positions = polyLineROI.getSceneHandlePositions()
+        return np.asarray(
+            [[polyLineROI.mapSceneToParent(p[1]).x(), 
+              polyLineROI.mapSceneToParent(p[1]).y()] for p in positions])
 
     def get_currdir(self):
         """
