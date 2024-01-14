@@ -17,18 +17,22 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-    - name: Install libGL1
-      run: |
-        sudo apt-get install -y libgl1
+    # - name: Install libGL1
+    #   run: |
+    #     sudo apt-get install -y libgl1
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v3
       with:
         python-version: ${{ matrix.python-version }}
     - name: Install dependencies
       run: |
+        echo "which python: $(which python)"
+        echo "python --version $(python --version)"
         python -m pip install --upgrade pip
         python -m pip install pytest
+        echo "which pytest: $(which pytest)"
         python -m pip install -e .
+        echo "python -c 'import PySide6; print(PySide6.__file__)': $(python -c 'import PySide6; print(PySide6.__file__)')"
     - name: Test with pytest
       run: |
         pytest
