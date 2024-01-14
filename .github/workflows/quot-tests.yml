@@ -18,6 +18,8 @@ jobs:
       run: |
         # $CONDA is an environment variable pointing to the root of the miniconda directory
         echo $CONDA/bin >> $GITHUB_PATH
+        echo $(which conda)
+        echo $(conda env list)
     - name: Install dependencies
       run: |
         conda init
