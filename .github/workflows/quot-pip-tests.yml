@@ -16,7 +16,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-    # graphics libraries required for running pyqtgraph in this Docker container
+    # graphics libraries required for running pyqtgraph in the
+    # Ubuntu Docker container
     - name: Install libgl1-mesa-dev
       run: |
         sudo apt-get install -y libgl1-mesa-dev
@@ -42,10 +43,6 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-    # graphics libraries required for running pyqtgraph in this Docker container
-    # - name: Install libgl1-mesa-dev
-    #   run: |
-    #     sudo apt-get install -y libgl1-mesa-dev
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v3
       with:
