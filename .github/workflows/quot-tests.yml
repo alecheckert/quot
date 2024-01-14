@@ -18,10 +18,10 @@ jobs:
       run: |
         # $CONDA is an environment variable pointing to the root of the miniconda directory
         echo $CONDA/bin >> $GITHUB_PATH
-        conda init
-        source ~/.bashrc
     - name: Install dependencies
       run: |
+        conda init
+        source ~/.bashrc
         conda env create -f quot_env.yml
         conda activate quot_env
         # conda env update --file quot_env.yml --name base
