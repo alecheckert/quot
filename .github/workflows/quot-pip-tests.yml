@@ -30,6 +30,7 @@ jobs:
         echo "python --version $(python --version)"
         python -m pip install --upgrade pip
         python -m pip install pytest
+        python -m pip install opencv-python-headless
         echo "which pytest: $(which pytest)"
         python -m pip install -e .
         echo "python -c 'import PySide6; print(PySide6.__file__)': $(python -c 'import PySide6; print(PySide6.__file__)')"
