@@ -17,9 +17,9 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-    - name: Install libGL
+    - name: Install libGL1
       run: |
-        sudo apt-get install -y libgl
+        sudo apt-get install -y libgl1
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v3
       with:
