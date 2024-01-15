@@ -1,3 +1,42 @@
 [build-system]
 requires = ["setuptools>42", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "quot"
+version = "3.1.0"
+requires-python = ">=3.7"
+readme = "README.md"
+authors = [
+    {name = "Alec Heckert", email = "alecheckert@gmail.com" },
+    {name = "Vinson Fan", email = "vinsfan@berkeley.edu" },
+]
+description = "Simple single molecule tracking pipeline with GUI"
+dependencies = [
+    "dask",
+    "matplotlib",
+    "munkres",
+    "nd2reader==3.2.1",
+    "nose2",
+    "numpy",
+    "pandas",
+    "scikit-image",
+    "scipy",
+    "seaborn",
+    "tifffile",
+    "toml",
+    "tqdm",
+    "pyqtgraph",
+    "pyside6",
+]
+
+[project.scripts]
+quot = "quot.gui.__main__:cli"
+quot-track = "quot.__main__:batch_track"
+quot-config = "quot.__main__:make_naive_config"
+
+[options]
+packages = [
+    "quot",
+    "quot.gui",
+]
