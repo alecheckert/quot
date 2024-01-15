@@ -463,10 +463,13 @@ def llr(I, k=1.0, w=9, t=20.0, return_filt=False):
     # Perform the convolutions for detection
     A = ndi.uniform_filter(I, w)
     B = ndi.uniform_filter(I**2, w)
-    C = fftshift(irfft2(rfft2(I)*G_rft, s=I.shape))**2
+    C = fftshift(irfft2(rfft2(I)*G_rft, s=I.shape))
+
+    # Only allow spots with positive curvature
+    C[C<0] = 0.0
 
     # Evaluate the log likelihood ratio for presence of a Gaussian spot
-    L = 1.0 - stable_divide_array(C, n_pixels*Sgc2*(B-A**2), zero=0.001)
+    L = 1.0 - stable_divide_array(C**2, n_pixels*Sgc2*(B-A**2), zero=0.001)
 
     # Set probability of detection close to edges to zero
     hw = w//2
