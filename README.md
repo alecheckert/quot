@@ -1,43 +1,27 @@
 # quot
 A simple GUI to compare spot detection and tracking methods in single molecule tracking data.
 
-## Install
+## Install from source
 
-1. Clone the repository:
-```
-    git clone https://github.com/alecheckert/quot.git
-```
-
-2. Create a `conda` environment for `quot`. (If you don't already have it, you'll need `conda`: https://docs.conda.io/en/latest/miniconda.html.) Navigate to the top-level `quot` directory and run 
+### Install with `pip`
 
 ```
-    conda env create -f quot_env.yml
+git clone https://github.com/alecheckert/quot.git
+cd quot
+pip install -e .
 ```
 
-3. Switch to the `quot_env` environment:
+### Install with `conda`/`mamba`
 
 ```
-    conda activate quot_env
+git clone https://github.com/alecheckert/quot.git
+cd quot
+conda env create -f quot_env.yml
+conda activate quot_env
+pip install -e .
 ```
 
-4. Finally, install the `quot` package. From the top-level `quot` directory, run
-
-```
-    python setup.py develop
-```
-
-`quot` is still in active development. The `develop` option  will track changes in the source files as new versions become available.
-
-## Alternative install with `pip`
-
-In the future `quot` will be installable with `pip` alone. This functionality is currently on the `quot_env_v2` branch. To install via this method, do:
-```
-  git clone https://github.com/alecheckert/quot.git
-  git checkout quot_env_v2
-  cd quot
-  # Make a new venv or something here
-  pip install -e .
-```
+`quot` is still in active development. The editable option (`-e`) to `pip install` will track changes in the source files as new versions become available.
 
 ## Run the `quot` GUI
 
