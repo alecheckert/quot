@@ -465,7 +465,7 @@ def llr(I, k=1.0, w=9, t=20.0, return_filt=False):
     B = ndi.uniform_filter(I**2, w)
     C = fftshift(irfft2(rfft2(I)*G_rft, s=I.shape))
 
-    # Only allow spots with positive curvature
+    # Only allow convex spots
     C[C<0] = 0.0
 
     # Evaluate the log likelihood ratio for presence of a Gaussian spot
