@@ -40,3 +40,7 @@ packages = [
     "quot",
     "quot.gui",
 ]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+include-package-data = true
