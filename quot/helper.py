@@ -341,6 +341,8 @@ def threshold_image(I, t=200.0, return_filt=False, mode='max'):
     """
     I_bin = I > t
     pos = label_spots(I_bin, intensity_img=I, mode=mode)
+    if pos.size == 0:
+        pos = pos.reshape((0, 2))
     if return_filt:
         return I, I_bin, pos 
     else:
