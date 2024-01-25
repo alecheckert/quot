@@ -268,14 +268,14 @@
         minimum = 0.1
         maximum = 7.0
         interval = 0.1
-        init_value = 1.3
+        init_value = 1.5
         type = "float"
     [detect_slider_config.llr.w]
         name = "w"
         minimum = 3
         maximum = 25
-        interval = 1
-        init_value = 15
+        interval = 2
+        init_value = 11
         type = "int"
     [detect_slider_config.llr.t]
         name = "t"
